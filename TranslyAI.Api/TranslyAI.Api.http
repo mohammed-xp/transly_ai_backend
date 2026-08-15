@@ -1,0 +1,6 @@
+@TranslyAI.Api_HostAddress = http://localhost:5260
+
+GET http://localhost:5260/health
+Accept: application/json
+
+###
