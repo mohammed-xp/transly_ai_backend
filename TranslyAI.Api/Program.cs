@@ -13,7 +13,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 
 app.MapControllers();
@@ -24,6 +24,6 @@ app.MapGet("/health", () => new
     status = "Healthy",
     time = DateTimeOffset.UtcNow,
     environment = app.Environment.EnvironmentName
-} );
+});
 
 app.Run();
