@@ -55,7 +55,7 @@ enum TranslationEngine { mlKit, ai }
 | ID | العنوان | Milestone | الحالة | نتيجة الـ review |
 |---|---|---|---|---|
 | TASK-001 | تنضيف الـ template + `/health` + أول commit | M0 | ✅ Done | Approved في الـ round التالت — اتنين rounds اتضاعوا في acceptance criteria متقروش |
-| TASK-002 | `POST /api/translations` بـ records و fake logic | M2 | 🚧 In progress | — |
+| TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | 🔁 Changes requested (r1) | الـ contract مطابق والـ endpoint شغال. بس تلات ملاحظات من الرسالة السابقة متطبقتش: `DateTime` بدل `DateTimeOffset`، `TranslationResponse` لسه mutable، DTOs من غير namespace |
 
 ## قرارات معمارية اتاخدت
 
@@ -74,11 +74,28 @@ enum TranslationEngine { mlKit, ai }
 | 11 | الـ envelope | مفيش — الـ object مباشرة | `{ "data": {...} }` | HTTP فيه status codes و`ProblemDetails`. الـ envelope بس لما يكون فيه metadata جنب البيانات (pagination) |
 | 12 | الـ quota | headers (`X-RateLimit-Remaining`) بعدين، مش في الـ body | حقل في الـ translation response | الـ quota مش جزء من الترجمة — في الـ headers بتشتغل على كل الـ endpoints بنفس الشكل |
 
+## 🔒 قاعدة ثابتة — Definition of Submitted
+
+> اتفرضت بعد TASK-002 round 1. قبل ما يقول "خلصت" لازم يعدّي التلاتة دول:
+> 1. يفتح آخر رسالة review ويعدّ الملاحظات — كل واحدة يا اتصلحت يا ليها سبب معلن
+> 2. يفتح ملف التاسك ويعدّ الـ acceptance criteria
+> 3. `dotnet format` + `git status`
+>
+> لو بعت شغل وفيه ملاحظة قديمة متطبقتش من غير سبب → الـ review بيرجع من غير ما أقرا الباقي.
+
 ## مفكرة الـ mentor — نقاط بتتكرر
 
 > لما حاجة تتكرر 3 مرات، تتحول لتاسك مخصصة ليها.
 
-- ⚠️ **بيبعت الشغل للمراجعة من غير ما يعدّ الـ acceptance criteria — اتكررت مرتين (TASK-001 rounds 1 و 2).** نفس الملاحظة (`status` الناقص) رجعت مرتين ورا بعض. اتقالت له صريحة في الـ round التاني. **المرة التالتة → نوقف الـ curriculum ونعمل تاسك مخصصة.**
+- 🔴 **بيبعت الشغل للمراجعة من غير ما يطبّق ملاحظات الـ review السابقة — 3 مرات، اتفعّلت.**
+  - TASK-001 r1 → `status` ناقص
+  - TASK-001 r2 → نفس `status` لسه ناقص بعد ما اتقال صريح
+  - TASK-002 r1 → تلات ملاحظات في رسالة واحدة (`DateTimeOffset` / namespace / `record` mutable)، طبّق واحدة وبعت "خلصت"
+  - **التدخّل:** قاعدة "Definition of Submitted" فوق بدل تاسك مخصصة — المشكلة process مش معرفة. هو عارف `DateTimeOffset`، بس مش بيرجع للرسالة.
+- 🔴 **`DateTime` بدل `DateTimeOffset` — 3 مرات** (TASK-001 r1، TASK-002 r1، وبعد ما اتنبّه في رسالة الـ unblock). القرار #4.
+- بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
+- بيصلّح الملاحظة في مكان واحد ويسيب المكان التاني المطابق (صلّح `TranslationRequest` وساب `TranslationResponse`)
+- ميل واضح لنقل Clean Architecture من الـ Flutter كما هي (عمل 3 فولدرات layers قبل ما يكتب endpoint واحد) — استجاب للـ pushback من غير جدال
 - بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
 - ميل واضح لنقل Clean Architecture من الـ Flutter كما هي (عمل 3 فولدرات layers قبل ما يكتب endpoint واحد) — استجاب للـ pushback من غير جدال
 
@@ -88,6 +105,8 @@ enum TranslationEngine { mlKit, ai }
 - بيسمع للـ pushback لما يكون معاه سبب، مش نبرة. مسح الـ 3 فولدرات من غير جدال.
 - بيسأل أسئلة صح قبل ما ينفذ ("الـ status يكون فيها ايه؟") بدل ما يخمن.
 - Conventional Commits من نفسه من غير ما حد يطلبها.
+- بيسأل قبل ما ينفذ لما يشك في قرار ("`/api/v1` ولا `/v1`؟"، "مين قال إني عايز `api.transly.ai`؟") — والتانية دي كانت اعتراض في محله على استنتاج مبني على placeholder.
+- استوعب `required` + `init` من كلمتين مفتاحيتين من غير كود. **ملاحظة لـ M4:** `required` + `[ApiController]` بيدوا 400 + ProblemDetails مجاناً — نبني عليها بدل ما نبدأ من الصفر.
 - عنده تمارين .NET قديمة في `source/repos` (HR.LeaveManagement, BookStoreApp, MyFirstApi) — لسه محتاجين نعرف وصل فيها لفين
 
 ## أسئلة intake لسه مجاوبش عليها

@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
+using TranslyAI.Api.Dtos;
 
 [ApiController]
 [Route("v1/[controller]")]
 public class TranslationsController : ControllerBase
 {
     [HttpPost]
-    public IActionResult Translations([FromBody] TranslationRequest translation)
+    public IActionResult Translate(TranslationRequest translation)
     {
         char[] chars = translation.Text.ToCharArray();
         Array.Reverse(chars);
         string translatedText = new string(chars);
+
         var translationResponse = new TranslationResponse
         {
             SourceText = translation.Text,
@@ -18,7 +20,7 @@ public class TranslationsController : ControllerBase
             TargetLanguage = translation.TargetLanguage,
             Tone = translation.Tone,
             Model = "stub",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
         };
         return Ok(translationResponse);
     }

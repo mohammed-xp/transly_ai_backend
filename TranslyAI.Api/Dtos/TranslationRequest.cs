@@ -1,3 +1,5 @@
+namespace TranslyAI.Api.Dtos;
+
 public record TranslationRequest
 {
     public required string Text { get; init; }
