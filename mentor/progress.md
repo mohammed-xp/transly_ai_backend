@@ -3,7 +3,7 @@
 > ملف الحالة بتاع الـ mentor. بيتقرا في أول كل جلسة وبيتحدث في آخرها.
 > مكانه: `mentor/progress.md` في الريبو بتاع الباك اند.
 
-**آخر تحديث:** 2026-08-15
+**آخر تحديث:** 2026-08-19
 
 ---
 
@@ -13,7 +13,7 @@
 - **الـ slice المتفق عليه:** الترجمة end-to-end من خلال الباك اند — التطبيق يبعت النص واللغة للـ API، والـ API هو اللي بيكلم Gemini ويرجع الترجمة. الـ Gemini key يقعد على السيرفر بس.
 - **باك اند موجود قبل كده؟** لأ.
 - **تصحيح مهم (2026-08-15):** التطبيق **مش** بينادي Gemini ولا أي AI. الـ `AiTranslationStubDatasource` بيرجّع `'[AI stub] $text'` بعد delay. الترجمة الحقيقية الشغالة = **ML Kit on-device**، والـ `TranslationRepositoryImpl` بيختار بينهم بالـ connectivity. يعني **مفيش key في التطبيق يتسرب** — الباك اند بيملا فراغ، مش بيصلح خطر قايم. الدافع الحقيقي = الاشتراكات + الـ quota.
-- **⚠️ سؤال مفتوح:** كوده بيقول **Claude** (`api_endpoints.dart` + التعليق في الـ stub)، وهو قال **Gemini**. مش محسوم لسه. معماريًا مش بيغير الـ endpoint.
+- **✅ اتحسم (2026-08-16): المزوّد = Gemini API** (Google AI Studio). الـ key جاهز عنده. الـ `api_endpoints.dart` بيقول Claude — ده placeholder قديم في كود الفلاتر، مش قرار.
 - **ريبو الفلاتر:** `mohammed-xp/transly_ai` (private, branch `main`). الوصول عن طريق `gh` — متسطب في `C:\Program Files\GitHub CLI\gh.exe` (مش على الـ PATH بتاع الـ shell) ومسجّل دخول بحسابه بـ scope `repo`.
 
 ## الـ Contract المستخرج من تطبيق الفلاتر
@@ -47,15 +47,28 @@ enum TranslationEngine { mlKit, ai }
 ## الوضع الحالي
 
 - **Milestone:** M2 — First real endpoints
-- **التاسك المفتوحة:** TASK-002 — عقد الترجمة (fake logic، من غير Gemini)
+- **التاسك المفتوحة:** مفيش — TASK-003 اتقفلت ✅ وهو طلب صريح إني مفتحش تاسك جديدة. يستنى «اديني تاسك».
+- **⚠️ متعملش commit لسه:** ٥ ملفات جديدة + ٤ معدّلة لسه uncommitted وقت الـ review.
 - **الوقت المتاح أسبوعياً:** ⏳ في انتظار الرد
+
+### الشغال دلوقتي
+
+- `GET /health` → `status` / `time` / `environment`
+- `POST /v1/translations` → **ترجمة حقيقية من Gemini**. `GeminiApiService` (typed HttpClient) + `GeminiOptions` من user secrets. فشل المزوّد → 502 + الـ status والـ body الحقيقي في الـ log. body ناقص → 400 ProblemDetails مجاناً.
+
+### أسئلة مفتوحة مؤجلة لـ M8
+
+- **HTTPS:** `UseHttpsRedirection` اتشالت خالص (قرار صح — الـ 307 على POST مش مناسب لـ mobile clients، والـ TLS بيتفك عند الـ edge). البديل: `UseHsts` + إجبار https عند الـ reverse proxy.
+- **الدومين:** لسه متحددش. `api.transly.ai` في كود الفلاتر **placeholder** مش قرار.
+- **الـ path prefix:** `/api` ممكن تتضاف عند الـ proxy (`UsePathBase`) من غير كود لو الدومين طلع من غير subdomain.
 
 ## التاسكات
 
 | ID | العنوان | Milestone | الحالة | نتيجة الـ review |
 |---|---|---|---|---|
 | TASK-001 | تنضيف الـ template + `/health` + أول commit | M0 | ✅ Done | Approved في الـ round التالت — اتنين rounds اتضاعوا في acceptance criteria متقروش |
-| TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | 🔁 Changes requested (r1) | الـ contract مطابق والـ endpoint شغال. بس تلات ملاحظات من الرسالة السابقة متطبقتش: `DateTime` بدل `DateTimeOffset`، `TranslationResponse` لسه mutable، DTOs من غير namespace |
+| TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | ✅ Done | Approved في r3. الـ contract مطابق حرف بحرف، `required`+`init` على الكل، 400 ProblemDetails مجاناً. الـ rounds الزيادة كانت ملاحظات متطبقتش مش أخطاء كود |
+| TASK-003 | الـ AI proxy الحقيقي — Gemini + typed HttpClient + user secrets | AI proxy | ✅ Done | Approved في r4. الـ boundary اتقفل صح في الآخر، والـ error handling اتاختبر على الحقيقي (503 + 429 من Gemini) وعدّى. الـ rounds التلاتة الأولى كلها كانت **نفس الدرس** بتلات أشكال — مين المسؤول عن معرفة ايه |
 
 ## قرارات معمارية اتاخدت
 
@@ -73,6 +86,12 @@ enum TranslationEngine { mlKit, ai }
 | 10 | `id` في الـ response | **مفيش دلوقتي** | `id` مولّد، أو `int` زي `HistoryEntry` | مفيش persistence فالـ id كذبة. إضافة حقل بعدين مش breaking. ولما ييجي يبقى `string` — الـ int التسلسلي بيسرّب حجم الاستخدام وبيسمح بالعد |
 | 11 | الـ envelope | مفيش — الـ object مباشرة | `{ "data": {...} }` | HTTP فيه status codes و`ProblemDetails`. الـ envelope بس لما يكون فيه metadata جنب البيانات (pagination) |
 | 12 | الـ quota | headers (`X-RateLimit-Remaining`) بعدين، مش في الـ body | حقل في الـ translation response | الـ quota مش جزء من الترجمة — في الـ headers بتشتغل على كل الـ endpoints بنفس الشكل |
+| 13 | ازاي ننادي HTTP | `IHttpClientFactory` + typed client بـ `HttpClient` خام | `new HttpClient()` · `static HttpClient` · Gemini SDK | الـ `new` كل request = socket exhaustion (`TIME_WAIT`)، والـ `static` بيكاش الـ DNS للأبد. الـ factory بيعمل rotate للـ handlers كل دقيقتين. والـ SDK هيتاخد بس لو احتجنا streaming/function calling/token counting |
+| 14 | مكان الـ API key | user secrets في الـ dev، env vars في الـ prod (M8) | `appsettings.Development.json` + gitignore · Key Vault دلوقتي | user secrets بره الريبو خالص (`%APPDATA%\Microsoft\UserSecrets`) — مستحيل يتكوميت. الـ `appsettings.Development.json` **أصلاً متكوميت** في الريبو ده. حماية بتعتمد على الانضباط مش حماية |
+| 15 | `ITranslationService` | مفيش interface — الـ controller بياخد الـ class نفسه | interface + implementation واحدة | الـ interface بتكسب seam بس. مفيش tests ولا مزوّد تاني ولا decorator → صفر مكسب. تتضاف أول ما واحدة من التلاتة دول تحصل — والـ extract refactor ثانيتين. في الفلاتر الـ abstraction دي كانت في محلها لأن `TranslationRepositoryImpl` بيختار runtime بين ML Kit والـ AI؛ هنا مفيش اختيار |
+| 16 | إشارة الفشل من الـ service | `return null` (الـ signature `Task<GeminiTranslationResult?>`) | `throw` exceptions مخصصة | caller واحد وstatus code واحد (502) → الـ `null` مش بيضيّع معلومة. **يتحوّل لـ exceptions** أول ما نحتاج نفرّق 429 (quota) عن 502 (المزوّد واقع) عن 500 (key غلط) — وساعتها الـ mapping يروح لـ `IExceptionHandler` مركزي في M4 |
+| 17 | شكل `GeminiTranslationResult` | `string Text` و `string ModelVersion` **مش nullable** | `string?` + فحص في الـ controller | النوع اللي بيسمح بـ `Text == null` بيمثّل حاجة ملهاش معنى، وبيجبر **كل** متصل يدافع عن نفسه. الفشل بيتقال مرة واحدة عن طريق `null` من الـ method كلها |
+| 18 | حقل `model` في الـ response | `modelVersion` الراجع من Gemini | `_options.Model` من الـ configuration | اتأكد عملياً: الـ config فيها `gemini-flash-latest` والرد جه `gemini-3.7-flash`. الـ alias بيتحرك تحتيك من غير deploy — الجودة والفاتورة يتغيروا وانت مش فاهم. **قبل الإنتاج: ثبّت اسم موديل صريح** |
 
 ## 🔒 قاعدة ثابتة — Definition of Submitted
 
@@ -92,12 +111,14 @@ enum TranslationEngine { mlKit, ai }
   - TASK-001 r2 → نفس `status` لسه ناقص بعد ما اتقال صريح
   - TASK-002 r1 → تلات ملاحظات في رسالة واحدة (`DateTimeOffset` / namespace / `record` mutable)، طبّق واحدة وبعت "خلصت"
   - **التدخّل:** قاعدة "Definition of Submitted" فوق بدل تاسك مخصصة — المشكلة process مش معرفة. هو عارف `DateTimeOffset`، بس مش بيرجع للرسالة.
+  - **✅ تحسّن في TASK-003:** طبّق الملاحظات كلها round بعد round، ولما ساب واحدة **قال ليه** (الـ `ApiKey` في `appsettings.json`) — وده بالظبط اللي القاعدة طالباه. القاعدة شغالة، تفضل.
 - 🔴 **`DateTime` بدل `DateTimeOffset` — 3 مرات** (TASK-001 r1، TASK-002 r1، وبعد ما اتنبّه في رسالة الـ unblock). القرار #4.
+- 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم — جديدة في TASK-003.** طلعله `CS8604` فخلّى الـ record `string?` عشان الـ warning يسكت، بدل ما يضمن القيمة. الـ warning بيختفي والمشكلة بتنتقل للي بعده. **يتراقب** — لو اتكرر يبقى تاسك عن nullable reference types.
+- 🟡 **بيتعامل مع الـ guard كأنه العقبة مش الأداة.** عمل comment على `EnsureSuccessStatusCode()` عشان يوقف الـ 500، فخلّى الفشل يعدّي صامت. الغريزة "أشيل اللي بيزعق" بدل "أتصرف في اللي بيزعق منه".
 - بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
 - بيصلّح الملاحظة في مكان واحد ويسيب المكان التاني المطابق (صلّح `TranslationRequest` وساب `TranslationResponse`)
 - ميل واضح لنقل Clean Architecture من الـ Flutter كما هي (عمل 3 فولدرات layers قبل ما يكتب endpoint واحد) — استجاب للـ pushback من غير جدال
-- بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
-- ميل واضح لنقل Clean Architecture من الـ Flutter كما هي (عمل 3 فولدرات layers قبل ما يكتب endpoint واحد) — استجاب للـ pushback من غير جدال
+- مبيشغّلش `dotnet build --no-incremental` ومبيبصش على الـ Problems panel — warnings كانت واقفة وهو شايف "Build succeeded"
 
 ## نقاط قوة
 
@@ -108,6 +129,8 @@ enum TranslationEngine { mlKit, ai }
 - بيسأل قبل ما ينفذ لما يشك في قرار ("`/api/v1` ولا `/v1`؟"، "مين قال إني عايز `api.transly.ai`؟") — والتانية دي كانت اعتراض في محله على استنتاج مبني على placeholder.
 - استوعب `required` + `init` من كلمتين مفتاحيتين من غير كود. **ملاحظة لـ M4:** `required` + `[ApiController]` بيدوا 400 + ProblemDetails مجاناً — نبني عليها بدل ما نبدأ من الصفر.
 - عنده تمارين .NET قديمة في `source/repos` (HR.LeaveManagement, BookStoreApp, MyFirstApi) — لسه محتاجين نعرف وصل فيها لفين
+- **بيعترض بحجة لما يكون معاه حق (TASK-003).** رفض يشيل `ApiKey` من `appsettings.json` وقال السبب: توثيق شكل الـ configuration + مفيش حد تاني على المشروع. حجة سليمة واتقبلت. **درس للـ mentor:** متعلّقش ملاحظة process كبيرة على أضعف نقطة في الليستة — ده بيحوّل النقاش عن الموضوع.
+- **بيوصل للحل الصح لو الشرح فيه "ليه" مش "ايه".** في TASK-003 محتاج 4 rounds، بس كل round كان بيتحرك خطوة حقيقية لما السبب اتشرح بمثال عملي (سيناريو 429) بدل قاعدة مجردة.
 
 ## أسئلة intake لسه مجاوبش عليها
 
@@ -115,8 +138,47 @@ enum TranslationEngine { mlKit, ai }
 2. مستوى الـ C#: LINQ و EF Core migrations عملهم بإيده قبل كده ولا لأ؟
 3. التطبيق فيه users/Firebase Auth دلوقتي؟ (بيحدد شكل M5) — مفيش feature auth في الريبو، فالأغلب لأ
 4. الوقت الأسبوعي بالساعات
-5. Gemini ولا Claude؟ (كوده بيقول Claude، هو قال Gemini)
+5. ✅ ~~Gemini ولا Claude؟~~ — **Gemini**، والـ key جاهز عنده (2026-08-16)
+
+## 🗺️ خريطة Transly — milestones مش تاسكات
+
+> الخريطة العامة M0→M8 في `.claude/skills/dotnet-mentor/references/curriculum.md`.
+> الجدول ده بيزرع فيها الحاجات الخاصة بـ Transly اللي مش موجودة هناك.
+> **خريطة مش عقد** — الترتيب بيتغير حسب المشروع، والتاسكات بتتكتب واحدة واحدة بعد كل review.
+
+| | Milestone | الحالة | خاص بـ Transly |
+|---|---|---|---|
+| M0 | Setup | ✅ | — |
+| M1 | C# لمطور Dart | 🔄 بيتاخد جوه التاسكات | `record`/`init`/`required`/`DateTimeOffset` اتاخدوا في TASK-002 |
+| M2 | أول endpoints | 🚧 **هنا** | `POST /v1/translations` ✅ · `GET /v1/languages` ⬜ · `TranslationTone` enum ⬜ |
+| — | **الـ AI proxy** | ✅ | اتعمل في TASK-003: `AddHttpClient<GeminiApiService>` + `GeminiOptions` من user secrets + prompt بالنبرات التلاتة + 502 على فشل المزوّد. **الباقي منه:** `finishReason`، `ValidateOnStart` للـ key، Timeout، تثبيت اسم الموديل |
+| M3 | EF Core | ⬜ | حفظ الترجمات + **نقل الـ history** من `history_local_datasource` للسيرفر (`HistoryEntry` فيها `isFavorite`) |
+| M4 | Validation / errors / logging | ⬜ | شكل الخطأ يطابق `sealed class Failure` عند الـ client (Network/Server/Cache/Offline/Unknown) |
+| M5 | Auth (JWT) | ⬜ | مفيش auth في التطبيق دلوقتي — تصميم من الصفر على الجهتين |
+| — | **العدّاد والاشتراكات** | ⬜ | **السبب اللي اتبنى عشانه الباك اند.** عدّ الاستهلاك (حروف ولا requests؟ — راجع درس `char`/`Rune`)، خطط، quota في `X-RateLimit-*` headers، رفض 429 |
+| — | **Streaming (SSE)** | ⬜ | الترجمة تظهر تدريجياً بدل انتظار الرد كامل — مكسب حقيقي في UX لتطبيق ترجمة |
+| M6 | Production concerns | ⬜ | caching للترجمات المتكررة (نفس النص + نفس الزوج = نفس الناتج — توفير مباشر في فاتورة الـ AI) |
+| M7 | Testing | ⬜ | — |
+| M8 | Docker + CI + نشر | ⬜ | الدومين، HTTPS عند الـ edge، وتوجيه `ApiEndpoints.baseUrl` على المنشور |
 
 ## الجلسة الجاية
 
-review لـ TASK-002 — أول controller وأول records. وقبل الـ review، قراية كود الفلاتر لو بعته وتعديل الـ contract على أساسه.
+مفيش تاسك مفتوحة — طلب صريح إني مفتحش واحدة جديدة. يستنى منه «اديني تاسك».
+
+**أول حاجة تتقال له:** يعمل commit — الشغل كله لسه uncommitted.
+
+**المرشحين لـ TASK-004، بالترتيب:**
+
+1. **`TranslationTone` enum** بدل الـ string (~30-45د) — دلوقتي `"tone":"banana"` بيرجع 200 وبيروح على `default` من غير أي تعليمة نبرة. بقت أهم بكتير بعد TASK-003 لأن النبرة بقت بتدخل في الـ prompt فعلاً. بتعلّم `JsonStringEnumConverter` والـ `switch` expression مع بعض. **دي الأنسب.**
+2. **تقوية الـ AI proxy** (~60د) — الـ 🟡 التلاتة من review TASK-003: `finishReason` في الـ log، `ValidateOnStart()` للـ key، وفصل `ModelVersion` الفاضية عن الفشل. تاسك "خلّي اللي بنيته صالح للإنتاج".
+3. **`GET /v1/languages`** (~45د) — أول collection response وأول قرار envelope في الـ lists.
+4. **M3 — EF Core** — حفظ الترجمات ونقل الـ history من الـ device.
+
+## ملاحظات من TASK-003 تتبني عليها بعدين
+
+- **الـ free tier بتاع Gemini = 20 request/دقيقة** على `gemini-3.7-flash`. ده الرقم اللي هيتبني حواليه العدّاد والـ quota.
+- `gemini-flash-latest` alias بيتحل لـ `gemini-3.7-flash` النهاردة. **يتثبت قبل الإنتاج.**
+- Gemini بيرجّع `finishReason` (`SAFETY` / `MAX_TOKENS` / `RECITATION`) وإحنا مش عاملينه deserialize — ده اللي هيفسّر الترجمات الفاضية.
+- `[ApiController]` + `required` بيدوا `ProblemDetails` كاملة بأسماء الحقول الناقصة مجاناً — اتأكد عملياً. نبني عليها في M4 بدل ما نبدأ من الصفر.
+
+**درس اتزرع ولسه هيتحصد:** `char` في C# = UTF-16 code unit مش حرف. اتبيّن عملياً في stub الترجمة (الإيموجي بقى `��` بعد `Array.Reverse`). نرجعله لما نحسب استهلاك الحروف للـ quota — `StringInfo` / `Rune`.

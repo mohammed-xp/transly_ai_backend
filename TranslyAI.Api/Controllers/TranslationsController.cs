@@ -1,27 +1,34 @@
 using Microsoft.AspNetCore.Mvc;
 using TranslyAI.Api.Dtos;
+using TranslyAI.Api.Services;
+
+namespace TranslyAI.Api.Controllers;
 
 [ApiController]
 [Route("v1/[controller]")]
-public class TranslationsController : ControllerBase
+public class TranslationsController(GeminiApiService geminiApiService) : ControllerBase
 {
     [HttpPost]
-    public IActionResult Translate(TranslationRequest translation)
+    public async Task<IActionResult> Translate(TranslationRequest translation, CancellationToken cancellationToken)
     {
-        char[] chars = translation.Text.ToCharArray();
-        Array.Reverse(chars);
-        string translatedText = new string(chars);
+        var response = await geminiApiService.TranslateAsync(translation, cancellationToken);
 
-        var translationResponse = new TranslationResponse
+        if (response == null)
+        {
+            return StatusCode(502, "Failed to get a response from the Gemini API.");
+        }
+
+        var tResponse = new TranslationResponse
         {
             SourceText = translation.Text,
-            TranslatedText = translatedText,
+            TranslatedText = response.Text,
             SourceLanguage = translation.SourceLanguage,
             TargetLanguage = translation.TargetLanguage,
+            Model = response.ModelVersion,
             Tone = translation.Tone,
-            Model = "stub",
             CreatedAt = DateTimeOffset.UtcNow,
         };
-        return Ok(translationResponse);
+
+        return Ok(tResponse);
     }
 }
