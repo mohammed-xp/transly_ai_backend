@@ -15,7 +15,11 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
 
         if (response == null)
         {
-            return StatusCode(502, "Failed to get a response from the Gemini API.");
+            return Problem(
+                detail: "Failed to get a response from the Gemini API.",
+                statusCode: StatusCodes.Status502BadGateway,
+                title: "Bad Gateway"
+            );
         }
 
         var tResponse = new TranslationResponse

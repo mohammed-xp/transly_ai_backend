@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Dtos.Gemini;
+using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Services;
 
@@ -25,23 +26,17 @@ public class GeminiApiService
 
     public async Task<GeminiTranslationResult?> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
     {
-        string toneInstruction;
-        switch (translationRequest.Tone)
+        string toneInstruction = translationRequest.Tone switch
         {
-            case "formal":
-                toneInstruction = "Use a formal, professional register.";
-                break;
-            case "casual":
-                toneInstruction = "Use a relaxed, conversational register.";
-                break;
-            case "short":
-                toneInstruction = "Translate as briefly as possible while preserving meaning.";
-                break;
-            default:
-                toneInstruction = "";
-                break;
-
-        }
+            TranslationTone.Formal => "Use a formal, professional register.",
+            TranslationTone.Casual => "Use a relaxed, conversational register.",
+            TranslationTone.Short => "Translate as briefly as possible while preserving meaning.",
+            _ => throw new ArgumentOutOfRangeException(
+                paramName: nameof(translationRequest.Tone),
+                actualValue: translationRequest.Tone,
+                message: "Invalid tone value."
+            ),
+        };
         string prompt = $"""
         You are a translation engine. Translate the following text from {translationRequest.SourceLanguage} to {translationRequest.TargetLanguage}.
         {toneInstruction}

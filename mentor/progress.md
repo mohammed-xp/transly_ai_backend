@@ -47,8 +47,8 @@ enum TranslationEngine { mlKit, ai }
 ## الوضع الحالي
 
 - **Milestone:** M2 — First real endpoints
-- **التاسك المفتوحة:** مفيش — TASK-003 اتقفلت ✅ وهو طلب صريح إني مفتحش تاسك جديدة. يستنى «اديني تاسك».
-- **⚠️ متعملش commit لسه:** ٥ ملفات جديدة + ٤ معدّلة لسه uncommitted وقت الـ review.
+- **التاسك المفتوحة:** 🚧 **TASK-004** — `TranslationTone` enum (اتفتحت 2026-08-19)
+- **✅ الـ commit اتعمل** — `5130ff0 feat: integrate Gemini API for real translations (TASK-003)`. الـ working tree نضيف.
 - **الوقت المتاح أسبوعياً:** ⏳ في انتظار الرد
 
 ### الشغال دلوقتي
@@ -69,6 +69,8 @@ enum TranslationEngine { mlKit, ai }
 | TASK-001 | تنضيف الـ template + `/health` + أول commit | M0 | ✅ Done | Approved في الـ round التالت — اتنين rounds اتضاعوا في acceptance criteria متقروش |
 | TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | ✅ Done | Approved في r3. الـ contract مطابق حرف بحرف، `required`+`init` على الكل، 400 ProblemDetails مجاناً. الـ rounds الزيادة كانت ملاحظات متطبقتش مش أخطاء كود |
 | TASK-003 | الـ AI proxy الحقيقي — Gemini + typed HttpClient + user secrets | AI proxy | ✅ Done | Approved في r4. الـ boundary اتقفل صح في الآخر، والـ error handling اتاختبر على الحقيقي (503 + 429 من Gemini) وعدّى. الـ rounds التلاتة الأولى كلها كانت **نفس الدرس** بتلات أشكال — مين المسؤول عن معرفة ايه |
+| TASK-004 | `TranslationTone` enum + switch expression + توحيد شكل الخطأ | M2 | ✅ Done | Approved في r2. الشكل العام صح من أول مرة (`_ => throw` مش `_ => ""`، 0 warnings، global converter بـ CamelCase). الـ r1 كانت ثغرة واحدة: `allowIntegerValues` فضل `true` → `"tone": 99` كان بيرجّع 500 + stack trace. اتصلحت واتحققت (99 → 400 ✅، 1 → 400 ✅) |
+| TASK-005 | تقوية الـ AI proxy — finishReason / ValidateOnStart / Timeout / تثبيت الموديل / OpenAPI | AI proxy | 🚧 مفتوحة | — |
 
 ## قرارات معمارية اتاخدت
 
@@ -92,6 +94,8 @@ enum TranslationEngine { mlKit, ai }
 | 16 | إشارة الفشل من الـ service | `return null` (الـ signature `Task<GeminiTranslationResult?>`) | `throw` exceptions مخصصة | caller واحد وstatus code واحد (502) → الـ `null` مش بيضيّع معلومة. **يتحوّل لـ exceptions** أول ما نحتاج نفرّق 429 (quota) عن 502 (المزوّد واقع) عن 500 (key غلط) — وساعتها الـ mapping يروح لـ `IExceptionHandler` مركزي في M4 |
 | 17 | شكل `GeminiTranslationResult` | `string Text` و `string ModelVersion` **مش nullable** | `string?` + فحص في الـ controller | النوع اللي بيسمح بـ `Text == null` بيمثّل حاجة ملهاش معنى، وبيجبر **كل** متصل يدافع عن نفسه. الفشل بيتقال مرة واحدة عن طريق `null` من الـ method كلها |
 | 18 | حقل `model` في الـ response | `modelVersion` الراجع من Gemini | `_options.Model` من الـ configuration | اتأكد عملياً: الـ config فيها `gemini-flash-latest` والرد جه `gemini-3.7-flash`. الـ alias بيتحرك تحتيك من غير deploy — الجودة والفاتورة يتغيروا وانت مش فاهم. **قبل الإنتاج: ثبّت اسم موديل صريح** |
+| 19 | نوع حقل `tone` | `enum` + `JsonStringEnumConverter` | `string` + regex/constants/`if` | الفرق مش validation — الفرق مين بيتحمّل المسؤولية. الـ string بيخلي **كل** method تسأل "هي دي قيمة صالحة؟"؛ الـ enum بيسأل مرة واحدة عند الـ binder والباقي بيشتغل على قيمة مضمونة. نفس مبدأ قرار #17. الـ string بيبقى صح بس لو القيم بتيجي من config/DB ومش معروفة وقت الـ compile |
+| 20 | الـ `_` arm في الـ switch expression | `_` بيرمي exception | من غير `_` (نعيش مع CS8509) · `_ => ""` | **enums في C# مش exhaustive زي Dart** — تحتها `int` و`(TranslationTone)99` بيـ compile. الـ binder بيحرس المدخلات الخارجية؛ الـ `_` بيحرس من الكود نفسه (cast غلط، أو عضو enum جديد بعد سنة من غير تعليمة). الـ `_ => ""` هي نفس الـ bug لابسة نوع جديد |
 
 ## 🔒 قاعدة ثابتة — Definition of Submitted
 
@@ -113,7 +117,11 @@ enum TranslationEngine { mlKit, ai }
   - **التدخّل:** قاعدة "Definition of Submitted" فوق بدل تاسك مخصصة — المشكلة process مش معرفة. هو عارف `DateTimeOffset`، بس مش بيرجع للرسالة.
   - **✅ تحسّن في TASK-003:** طبّق الملاحظات كلها round بعد round، ولما ساب واحدة **قال ليه** (الـ `ApiKey` في `appsettings.json`) — وده بالظبط اللي القاعدة طالباه. القاعدة شغالة، تفضل.
 - 🔴 **`DateTime` بدل `DateTimeOffset` — 3 مرات** (TASK-001 r1، TASK-002 r1، وبعد ما اتنبّه في رسالة الـ unblock). القرار #4.
-- 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم — جديدة في TASK-003.** طلعله `CS8604` فخلّى الـ record `string?` عشان الـ warning يسكت، بدل ما يضمن القيمة. الـ warning بيختفي والمشكلة بتنتقل للي بعده. **يتراقب** — لو اتكرر يبقى تاسك عن nullable reference types.
+- 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم — جديدة في TASK-003.** طلعله `CS8604` فخلّى الـ record `string?` عشان الـ warning يسكت، بدل ما يضمن القيمة. **✅ متكررش في TASK-004** — كتب `_ => throw` مش `_ => ""` رغم إن التانية كانت أسهل وكانت هتسكّت `CS8509`. النمط ده اتحسن، يفضل مراقب من بعيد.
+- 🟡 **بيعتمد على الـ default بتاع API من غير ما يفتح الـ signature — جديدة في TASK-004.** كتب `new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)` من غير ما ياخد باله إن فيه parameter تاني `allowIntegerValues` الافتراضي بتاعه `true`. النتيجة: ثغرة 500 + stack trace من مدخل خارجي. **والتاسك كانت طالبة منه صراحة يجرّب `"tone": 1`** وقال إنها هي اللي هتحدد الإجابة — وتخطّاها.
+  - **مرتبط بنمط قديم:** "بيتّبع الـ snippets حرفياً من غير ما يسأل بتعمل ايه". الفرق إن هنا الـ snippet كان من دماغه، فالمشكلة أعمق: **الثقة في الـ default من غير قراية**.
+  - **التدخّل:** كل تاسك من هنا ورايح فيها "سؤال تجاوب عليه بالتجربة" — سؤال واحد لازم يجاوب عليه برد فعلي مش بافتراض. اتحط في TASK-005.
+  - لو اتكرر بعد التدخل ده → تاسك مخصصة: يقرا signature كامل لكل API جديد قبل ما يستعمله.
 - 🟡 **بيتعامل مع الـ guard كأنه العقبة مش الأداة.** عمل comment على `EnsureSuccessStatusCode()` عشان يوقف الـ 500، فخلّى الفشل يعدّي صامت. الغريزة "أشيل اللي بيزعق" بدل "أتصرف في اللي بيزعق منه".
 - بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
 - بيصلّح الملاحظة في مكان واحد ويسيب المكان التاني المطابق (صلّح `TranslationRequest` وساب `TranslationResponse`)
@@ -163,20 +171,28 @@ enum TranslationEngine { mlKit, ai }
 
 ## الجلسة الجاية
 
-مفيش تاسك مفتوحة — طلب صريح إني مفتحش واحدة جديدة. يستنى منه «اديني تاسك».
+**TASK-004 ✅ Approved. TASK-005 مفتوحة** — `mentor/tasks/TASK-005.md` (تقوية الـ AI proxy).
 
-**أول حاجة تتقال له:** يعمل commit — الشغل كله لسه uncommitted.
+**⚠️ دين تحقق مفتوح من TASK-004:** الـ response بيرجّع `"casual"` ولا `"Casual"`؟ **متحقق منه هو، مش مني** — الـ Gemini quota خلصت وقت الـ review فكل المحاولات رجعت 502. أول 200 يشوفه، يتأكد من الحقل. لو طلع `"Casual"` ده بيكسر الـ parse عند التطبيق.
 
-**المرشحين لـ TASK-004، بالترتيب:**
+**⚠️ متعملش commit لسه** — شغل TASK-004 كله + ملفات `mentor/` لسه uncommitted.
 
-1. **`TranslationTone` enum** بدل الـ string (~30-45د) — دلوقتي `"tone":"banana"` بيرجع 200 وبيروح على `default` من غير أي تعليمة نبرة. بقت أهم بكتير بعد TASK-003 لأن النبرة بقت بتدخل في الـ prompt فعلاً. بتعلّم `JsonStringEnumConverter` والـ `switch` expression مع بعض. **دي الأنسب.**
-2. **تقوية الـ AI proxy** (~60د) — الـ 🟡 التلاتة من review TASK-003: `finishReason` في الـ log، `ValidateOnStart()` للـ key، وفصل `ModelVersion` الفاضية عن الفشل. تاسك "خلّي اللي بنيته صالح للإنتاج".
-3. **`GET /v1/languages`** (~45د) — أول collection response وأول قرار envelope في الـ lists.
-4. **M3 — EF Core** — حفظ الترجمات ونقل الـ history من الـ device.
+**المرشحين لـ TASK-006، بالترتيب:**
+
+1. **`GET /v1/languages`** (~45د) — أول collection response وأول قرار envelope في الـ lists.
+2. **M3 — EF Core** — حفظ الترجمات ونقل الـ history من الـ device.
+
+> ⚠️ **قبل M3:** لازم نتكلم في الـ Gemini billing. الـ 20 request/يوم مش كفاية للتطوير نفسه (شوف قسم ملاحظات TASK-003).
+
+## ملاحظات من TASK-004 تتبني عليها بعدين
+
+- **الـ `_` arm في switch expression على enum بيبقى unreachable من الـ wire بس لو الـ binder رافض الأرقام.** الاتنين لازم يتظبطوا مع بعض — الـ type لوحده مش ضمانة عند الـ HTTP boundary.
+- **الـ 400 الافتراضي من `[ApiController]` بيحط رسالة الـ `JsonException` كما هي في الـ ModelState** وفيها الـ FQN بتاع النوع الداخلي. مادة جاهزة لدرس M4 عن الـ error contract.
+- في الـ 400 بتاع deserialization فاشل، الـ ModelState بيرجّع كمان `"translation": ["The translation field is required."]` — **اسم الـ parameter في الـ action** بيتسرّب للـ client كأنه اسم حقل. سبب إضافي لـ `IExceptionHandler` مركزي في M4.
 
 ## ملاحظات من TASK-003 تتبني عليها بعدين
 
-- **الـ free tier بتاع Gemini = 20 request/دقيقة** على `gemini-3.7-flash`. ده الرقم اللي هيتبني حواليه العدّاد والـ quota.
+- **⚠️ تصحيح (2026-08-19): الـ free tier بتاع Gemini = 20 request/*اليوم*، مش الدقيقة.** الـ quota خلصت أثناء review TASK-004 والـ log قال بالنص: `quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier` · `quotaValue: 20` · `model: gemini-3.7-flash`. **الأثر:** الـ free tier مش كفاية حتى للـ manual testing اليومي — يعني موضوع الـ billing/paid tier بقى عايق للتطوير نفسه، مش بس feature مؤجلة. يتناقش قبل M3.
 - `gemini-flash-latest` alias بيتحل لـ `gemini-3.7-flash` النهاردة. **يتثبت قبل الإنتاج.**
 - Gemini بيرجّع `finishReason` (`SAFETY` / `MAX_TOKENS` / `RECITATION`) وإحنا مش عاملينه deserialize — ده اللي هيفسّر الترجمات الفاضية.
 - `[ApiController]` + `required` بيدوا `ProblemDetails` كاملة بأسماء الحقول الناقصة مجاناً — اتأكد عملياً. نبني عليها في M4 بدل ما نبدأ من الصفر.
