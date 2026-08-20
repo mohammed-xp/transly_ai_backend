@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Dtos.Gemini;
 
@@ -14,6 +15,9 @@ public class Candidate
 {
     [JsonPropertyName("content")]
     public required GeminiResponseContent Content { get; set; }
+    [JsonPropertyName("finishReason")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public required GeminiFinishReason FinishReason { get; set; }
 }
 
 public class GeminiResponseContent

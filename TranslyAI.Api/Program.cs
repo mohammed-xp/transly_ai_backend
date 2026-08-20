@@ -10,18 +10,25 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(
-            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
+            new JsonStringEnumConverter(
+                JsonNamingPolicy.CamelCase,
+                allowIntegerValues: false)
         );
     });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.Configure<GeminiOptions>(
-    builder.Configuration.GetSection("Gemini")
-);
+// builder.Configuration.GetSection("Gemini")
+builder.Services.AddOptions<GeminiOptions>()
+    .Bind(builder.Configuration.GetSection("Gemini"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 
-builder.Services.AddHttpClient<GeminiApiService>();
+builder.Services.AddHttpClient<GeminiApiService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 
 var app = builder.Build();
 

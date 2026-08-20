@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Dtos;
@@ -21,10 +22,11 @@ public class GeminiApiService
 
         _httpClient.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
         _httpClient.DefaultRequestHeaders.Add("x-goog-api-key", _options.ApiKey);
+        _httpClient.Timeout = TimeSpan.FromSeconds(15);
     }
 
 
-    public async Task<GeminiTranslationResult?> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
+    public async Task<TranslationOutcome> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
     {
         string toneInstruction = translationRequest.Tone switch
         {
@@ -70,25 +72,50 @@ public class GeminiApiService
         {
             var errorBody = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogError("Gemini returned {Status}: {Body}", (int)httpResponse.StatusCode, errorBody);
-            return null;
+            return httpResponse.StatusCode switch
+            {
+                HttpStatusCode.TooManyRequests => new TranslationOutcome.RateLimited(
+                        RetryAfter: httpResponse.Headers.RetryAfter?.Delta
+                    ),
+                HttpStatusCode.BadRequest => new TranslationOutcome.InvalidRequest(),
+                HttpStatusCode.Forbidden => new TranslationOutcome.InvalidRequest(),
+                _ => new TranslationOutcome.UpstreamError(),
+            };
         }
 
         var response = await httpResponse.Content.ReadFromJsonAsync<GeminiResponseDto>(cancellationToken);
 
-        var translatedText = response?.Candidates.FirstOrDefault()?.Content.Parts.FirstOrDefault()?.Text;
+        var candidate = response?.Candidates.FirstOrDefault();
 
-        if (string.IsNullOrWhiteSpace(translatedText) || string.IsNullOrWhiteSpace(response?.ModelVersion))
+        if (response is null || candidate is null)
         {
-            _logger.LogError("Gemini returned an empty translation.");
-            return null;
+            _logger.LogError("Gemini returned an empty response.");
+            return new TranslationOutcome.UpstreamError();
         }
 
-        var geminiTranslationResult = new GeminiTranslationResult(
+        if (candidate.FinishReason != GeminiFinishReason.STOP)
+        {
+            _logger.LogError("Gemini returned an incomplete response. FinishReason: {FinishReason}", candidate.FinishReason);
+            return new TranslationOutcome.NotCompleted(
+                FinishReason: candidate.FinishReason
+            );
+        }
+
+        var translatedText = candidate.Content.Parts.FirstOrDefault()?.Text;
+
+        if (string.IsNullOrWhiteSpace(translatedText)
+            || string.IsNullOrWhiteSpace(response.ModelVersion)
+            )
+        {
+            _logger.LogError("Gemini returned an empty translation.");
+            return new TranslationOutcome.UpstreamError();
+        }
+
+
+        return new TranslationOutcome.Success(
             translatedText,
             response.ModelVersion
             );
-
-        return geminiTranslationResult;
     }
 
 

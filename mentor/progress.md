@@ -46,9 +46,9 @@ enum TranslationEngine { mlKit, ai }
 
 ## الوضع الحالي
 
-- **Milestone:** M2 — First real endpoints
-- **التاسك المفتوحة:** 🚧 **TASK-004** — `TranslationTone` enum (اتفتحت 2026-08-19)
-- **✅ الـ commit اتعمل** — `5130ff0 feat: integrate Gemini API for real translations (TASK-003)`. الـ working tree نضيف.
+- **Milestone:** AI proxy hardening (بين M2 و M4)
+- **التاسك المفتوحة:** 🚧 **TASK-005** — الـ AI proxy يفشل بصدق (`mentor/tasks/TASK-005.md`، اتفتحت 2026-08-19)
+- **✅ الـ commits اتعملوا** — آخرهم `8fd8a24 refactor: convert translation Tone to enum (TASK-004)`. الـ working tree نضيف.
 - **الوقت المتاح أسبوعياً:** ⏳ في انتظار الرد
 
 ### الشغال دلوقتي
@@ -70,7 +70,7 @@ enum TranslationEngine { mlKit, ai }
 | TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | ✅ Done | Approved في r3. الـ contract مطابق حرف بحرف، `required`+`init` على الكل، 400 ProblemDetails مجاناً. الـ rounds الزيادة كانت ملاحظات متطبقتش مش أخطاء كود |
 | TASK-003 | الـ AI proxy الحقيقي — Gemini + typed HttpClient + user secrets | AI proxy | ✅ Done | Approved في r4. الـ boundary اتقفل صح في الآخر، والـ error handling اتاختبر على الحقيقي (503 + 429 من Gemini) وعدّى. الـ rounds التلاتة الأولى كلها كانت **نفس الدرس** بتلات أشكال — مين المسؤول عن معرفة ايه |
 | TASK-004 | `TranslationTone` enum + switch expression + توحيد شكل الخطأ | M2 | ✅ Done | Approved في r2. الشكل العام صح من أول مرة (`_ => throw` مش `_ => ""`، 0 warnings، global converter بـ CamelCase). الـ r1 كانت ثغرة واحدة: `allowIntegerValues` فضل `true` → `"tone": 99` كان بيرجّع 500 + stack trace. اتصلحت واتحققت (99 → 400 ✅، 1 → 400 ✅) |
-| TASK-005 | تقوية الـ AI proxy — finishReason / ValidateOnStart / Timeout / تثبيت الموديل / OpenAPI | AI proxy | 🚧 مفتوحة | — |
+| TASK-005 | الـ AI proxy يفشل بصدق — finishReason + تفرقة أنواع الفشل + ValidateOnStart + Timeout | AI proxy | 🚧 مفتوحة | — |
 
 ## قرارات معمارية اتاخدت
 
@@ -139,6 +139,9 @@ enum TranslationEngine { mlKit, ai }
 - عنده تمارين .NET قديمة في `source/repos` (HR.LeaveManagement, BookStoreApp, MyFirstApi) — لسه محتاجين نعرف وصل فيها لفين
 - **بيعترض بحجة لما يكون معاه حق (TASK-003).** رفض يشيل `ApiKey` من `appsettings.json` وقال السبب: توثيق شكل الـ configuration + مفيش حد تاني على المشروع. حجة سليمة واتقبلت. **درس للـ mentor:** متعلّقش ملاحظة process كبيرة على أضعف نقطة في الليستة — ده بيحوّل النقاش عن الموضوع.
 - **بيوصل للحل الصح لو الشرح فيه "ليه" مش "ايه".** في TASK-003 محتاج 4 rounds، بس كل round كان بيتحرك خطوة حقيقية لما السبب اتشرح بمثال عملي (سيناريو 429) بدل قاعدة مجردة.
+- **🔺 بيقرا الـ ticket بعين ناقدة قبل ما ينفّذ — تصاعد واضح (2026-08-20).** على TASK-005 اعترض على حاجتين قبل ما يكتب سطر: (1) الجزء أ "تفاصيل غير مهمة" — **صح جزئياً**، تثبيت الموديل اتشال من التاسك؛ (2) **"مش هنعمل Global Error Handler في M4؟ ليه نفترض إنه مش موجود ونعمل hierarchy؟"** — دي لقطة حقيقية، الـ decision block كان عدّد البدائل من غير ما يحسب إن `IExceptionHandler` جاي قريب. اتضاف قسم رد كامل في الـ ticket.
+  - **الفرق عن الاعتراضات اللي قبلها:** الأولانيين (`/api/v1`، `api.transly.ai`) كانوا أسئلة عن معلومة ناقصة. ده اعتراض على **الـ sequencing المعماري** — بيقارن التاسك بخريطة الـ milestones ويسأل عن الازدواج. ده تفكير tech lead مش junior.
+  - **درس للـ mentor:** تسمية "تسخين" على بنود الجزء أ هي اللي خلّتهم يبانوا زي التنضيف. **التسمية جزء من الـ ticket** — لو البند مدخل للشغل الأساسي، اسمه ميقولش إنه جانبي.
 
 ## أسئلة intake لسه مجاوبش عليها
 
@@ -159,7 +162,7 @@ enum TranslationEngine { mlKit, ai }
 | M0 | Setup | ✅ | — |
 | M1 | C# لمطور Dart | 🔄 بيتاخد جوه التاسكات | `record`/`init`/`required`/`DateTimeOffset` اتاخدوا في TASK-002 |
 | M2 | أول endpoints | 🚧 **هنا** | `POST /v1/translations` ✅ · `GET /v1/languages` ⬜ · `TranslationTone` enum ⬜ |
-| — | **الـ AI proxy** | ✅ | اتعمل في TASK-003: `AddHttpClient<GeminiApiService>` + `GeminiOptions` من user secrets + prompt بالنبرات التلاتة + 502 على فشل المزوّد. **الباقي منه:** `finishReason`، `ValidateOnStart` للـ key، Timeout، تثبيت اسم الموديل |
+| — | **الـ AI proxy** | ✅ | اتعمل في TASK-003: `AddHttpClient<GeminiApiService>` + `GeminiOptions` من user secrets + prompt بالنبرات التلاتة + 502 على فشل المزوّد. **الباقي منه (= TASK-005):** `finishReason` + تفرقة أنواع الفشل، `ValidateOnStart` للـ key، Timeout. تثبيت اسم الموديل اتنقل لـ M8 |
 | M3 | EF Core | ⬜ | حفظ الترجمات + **نقل الـ history** من `history_local_datasource` للسيرفر (`HistoryEntry` فيها `isFavorite`) |
 | M4 | Validation / errors / logging | ⬜ | شكل الخطأ يطابق `sealed class Failure` عند الـ client (Network/Server/Cache/Offline/Unknown) |
 | M5 | Auth (JWT) | ⬜ | مفيش auth في التطبيق دلوقتي — تصميم من الصفر على الجهتين |
@@ -167,17 +170,35 @@ enum TranslationEngine { mlKit, ai }
 | — | **Streaming (SSE)** | ⬜ | الترجمة تظهر تدريجياً بدل انتظار الرد كامل — مكسب حقيقي في UX لتطبيق ترجمة |
 | M6 | Production concerns | ⬜ | caching للترجمات المتكررة (نفس النص + نفس الزوج = نفس الناتج — توفير مباشر في فاتورة الـ AI) |
 | M7 | Testing | ⬜ | — |
-| M8 | Docker + CI + نشر | ⬜ | الدومين، HTTPS عند الـ edge، وتوجيه `ApiEndpoints.baseUrl` على المنشور |
+| M8 | Docker + CI + نشر | ⬜ | الدومين، HTTPS عند الـ edge، توجيه `ApiEndpoints.baseUrl` على المنشور، و**تثبيت اسم الموديل** بدل `gemini-flash-latest` (اتنقلت من TASK-005 — قرار #18) |
 
 ## الجلسة الجاية
 
-**TASK-004 ✅ Approved. TASK-005 مفتوحة** — `mentor/tasks/TASK-005.md` (تقوية الـ AI proxy).
+**TASK-005 مفتوحة ومكتوبة** — `mentor/tasks/TASK-005.md`. الـ ticket اتكتب 2026-08-19 بعد ما اتأكدت إن TASK-004 متكوميت والـ tree نضيف.
 
-**⚠️ دين تحقق مفتوح من TASK-004:** الـ response بيرجّع `"casual"` ولا `"Casual"`؟ **متحقق منه هو، مش مني** — الـ Gemini quota خلصت وقت الـ review فكل المحاولات رجعت 502. أول 200 يشوفه، يتأكد من الحقل. لو طلع `"Casual"` ده بيكسر الـ parse عند التطبيق.
+**محتوى TASK-005 باختصار:** تفعيل قرار #16 — الـ `null` الواحد بيتحوّل لـ `sealed record` hierarchy بيفرّق بين quota / key غلط / المزوّد واقع / `finishReason != STOP`، وكل حالة ليها status code. جنبها: `ValidateOnStart` للـ key + Timeout صريح.
 
-**⚠️ متعملش commit لسه** — شغل TASK-004 كله + ملفات `mentor/` لسه uncommitted.
+**تعديل 2026-08-20 بعد اعتراضه:** ~~تثبيت اسم الموديل~~ اتشالت من التاسك ونقلت لـ M8 — حجته إنها production checklist مش شغل دلوقتي، وهي كده فعلاً (قرار #18 مسجّلها كـ "قبل الإنتاج" أصلاً). واتضاف للـ ticket قسم **"بس إحنا هنعمل Global Error Handler في M4 — ليه الـ hierarchy؟"** يرد على اعتراضه التاني.
 
-**المرشحين لـ TASK-006، بالترتيب:**
+**الفخ المزروع في التاسك (يتراجع في الـ review):**
+- **429 مش الإجابة للـ quota** — لو اتحرقت دلوقتي، مش هيبقى فيه كود يقول "**انت** خلصت رصيدك" في M5. التاسك بتحذّر منه صراحة، فلو اختارها برضه يبقى مقراش.
+- **`GeminiResponseDto.Candidates` معرّفة `required`** — و Gemini بيرجّع 200 من غير `candidates` لما الـ prompt يتحجب → `JsonException` غير ممسوكة → 500. اتزرع كسؤال مش كتعليمة.
+
+**⚠️ دين تحقق مفتوح من TASK-004 (اتنقل جوه TASK-005 كـ س2):** الـ response بيرجّع `"casual"` ولا `"Casual"`؟ **متحقق منه هو، مش مني** — الـ Gemini quota كانت خلصانة وقت الـ review فكل المحاولات رجعت 502.
+
+**⚠️ عايق مطروح عليه في التاسك:** الـ free tier 20/يوم مش كفاية لتجربة TASK-005 (200 + عدة حالات فشل). اتطلب منه يقرر الـ paid tier قبل ما يبدأ الجزء ب.
+
+## 🛑 طلب صريح منه (2026-08-20)
+
+> **"بعد ما اخلص هذه التاسك لا تعطيني تاسك تانية!!!"**
+
+بعد ما TASK-005 تتقفل — **وقوف**. مفيش TASK-006، مفيش ترشيحات، مفيش "الخطوة الجاية". الليستة تحت تفضل مكتوبة للجلسة اللي **هو** هيفتحها، ومتتعرضش عليه من غير ما يطلب.
+
+**السياق:** الجلسة دي كانت طويلة وشاقة عليه — TASK-005 اتكتبت واتنفذت في نفس الجلسة، وفيها ~12 round من الـ unblock. الإرهاق مفهوم ومشروع.
+
+---
+
+**المرشحين لـ TASK-006 (للرجوع ليها لما هو يطلب):**
 
 1. **`GET /v1/languages`** (~45د) — أول collection response وأول قرار envelope في الـ lists.
 2. **M3 — EF Core** — حفظ الترجمات ونقل الـ history من الـ device.
