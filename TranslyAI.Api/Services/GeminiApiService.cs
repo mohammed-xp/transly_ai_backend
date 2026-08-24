@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Dtos;
@@ -6,7 +7,6 @@ using TranslyAI.Api.Dtos.Gemini;
 using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Services;
-
 
 public class GeminiApiService
 {
@@ -22,9 +22,7 @@ public class GeminiApiService
 
         _httpClient.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
         _httpClient.DefaultRequestHeaders.Add("x-goog-api-key", _options.ApiKey);
-        _httpClient.Timeout = TimeSpan.FromSeconds(15);
     }
-
 
     public async Task<TranslationOutcome> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
     {
@@ -39,6 +37,7 @@ public class GeminiApiService
                 message: "Invalid tone value."
             ),
         };
+
         string prompt = $"""
         You are a translation engine. Translate the following text from {translationRequest.SourceLanguage} to {translationRequest.TargetLanguage}.
         {toneInstruction}
@@ -51,73 +50,112 @@ public class GeminiApiService
         {
             Contents = [
                 new GeminiRequestContent
-            {
-                Parts = [
-                    new GeminiRequestPart
-                    {
-                        Text = prompt,
-                    }
-                ]
-            }
+                {
+                    Parts = [
+                        new GeminiRequestPart
+                        {
+                            Text = prompt,
+                        }
+                    ]
+                }
             ]
         };
 
-        var httpResponse = await _httpClient.PostAsJsonAsync(
-            $"v1beta/models/{_options.Model}:generateContent",
-            geminiRequestDto,
-            cancellationToken
-        );
+        HttpResponseMessage httpResponse;
+        try
+        {
+            httpResponse = await _httpClient.PostAsJsonAsync(
+                $"v1beta/models/{_options.Model}:generateContent",
+                geminiRequestDto,
+                cancellationToken
+            );
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "Gemini did not respond within {Timeout}.", _httpClient.Timeout);
+            return new TranslationOutcome.UpstreamTimeout();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Could not reach Gemini.");
+            return new TranslationOutcome.UpstreamError();
+        }
 
         if (!httpResponse.IsSuccessStatusCode)
         {
             var errorBody = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogError("Gemini returned {Status}: {Body}", (int)httpResponse.StatusCode, errorBody);
+
             return httpResponse.StatusCode switch
             {
                 HttpStatusCode.TooManyRequests => new TranslationOutcome.RateLimited(
-                        RetryAfter: httpResponse.Headers.RetryAfter?.Delta
-                    ),
-                HttpStatusCode.BadRequest => new TranslationOutcome.InvalidRequest(),
-                HttpStatusCode.Forbidden => new TranslationOutcome.InvalidRequest(),
+                    RetryAfter: httpResponse.Headers.RetryAfter?.Delta
+                ),
+                HttpStatusCode.BadRequest
+                    or HttpStatusCode.Unauthorized
+                    or HttpStatusCode.Forbidden => new TranslationOutcome.InvalidRequest(),
                 _ => new TranslationOutcome.UpstreamError(),
             };
         }
 
-        var response = await httpResponse.Content.ReadFromJsonAsync<GeminiResponseDto>(cancellationToken);
-
-        var candidate = response?.Candidates.FirstOrDefault();
-
-        if (response is null || candidate is null)
+        GeminiResponseDto? response;
+        try
         {
-            _logger.LogError("Gemini returned an empty response.");
+            response = await httpResponse.Content.ReadFromJsonAsync<GeminiResponseDto>(cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Gemini returned a body that is not valid JSON.");
             return new TranslationOutcome.UpstreamError();
         }
 
-        if (candidate.FinishReason != GeminiFinishReason.STOP)
+        if (response is null)
         {
-            _logger.LogError("Gemini returned an incomplete response. FinishReason: {FinishReason}", candidate.FinishReason);
-            return new TranslationOutcome.NotCompleted(
-                FinishReason: candidate.FinishReason
-            );
-        }
-
-        var translatedText = candidate.Content.Parts.FirstOrDefault()?.Text;
-
-        if (string.IsNullOrWhiteSpace(translatedText)
-            || string.IsNullOrWhiteSpace(response.ModelVersion)
-            )
-        {
-            _logger.LogError("Gemini returned an empty translation.");
+            _logger.LogError("Gemini returned an empty body.");
             return new TranslationOutcome.UpstreamError();
         }
 
+        var candidate = response.Candidates?.FirstOrDefault();
 
-        return new TranslationOutcome.Success(
-            translatedText,
-            response.ModelVersion
-            );
+        if (candidate is null)
+        {
+            _logger.LogError("Gemini returned 200 with no candidates — the prompt was most likely blocked.");
+            return new TranslationOutcome.UpstreamError();
+        }
+
+        var finishReason = MapFinishReason(candidate.FinishReason);
+
+        if (finishReason == GeminiFinishReason.Unknown)
+        {
+            _logger.LogWarning(
+                "Gemini returned an unrecognised finishReason: {Raw}. GeminiFinishReason may need a new member.",
+                candidate.FinishReason);
+        }
+
+        if (finishReason != GeminiFinishReason.Stop)
+        {
+            _logger.LogError("Gemini stopped early. finishReason: {Raw}", candidate.FinishReason);
+            return new TranslationOutcome.NotCompleted(finishReason);
+        }
+
+        var translatedText = candidate.Content?.Parts?.FirstOrDefault()?.Text;
+
+        if (string.IsNullOrWhiteSpace(translatedText) || string.IsNullOrWhiteSpace(response.ModelVersion))
+        {
+            _logger.LogError("Gemini returned STOP but no usable text or modelVersion.");
+            return new TranslationOutcome.UpstreamError();
+        }
+
+        return new TranslationOutcome.Success(translatedText, response.ModelVersion);
     }
 
-
-
+    private static GeminiFinishReason MapFinishReason(string? raw) => raw switch
+    {
+        "STOP" => GeminiFinishReason.Stop,
+        "MAX_TOKENS" => GeminiFinishReason.MaxTokens,
+        "SAFETY" => GeminiFinishReason.Safety,
+        "RECITATION" => GeminiFinishReason.Recitation,
+        "OTHER" => GeminiFinishReason.Other,
+        _ => GeminiFinishReason.Unknown,
+    };
 }

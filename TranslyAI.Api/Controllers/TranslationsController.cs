@@ -12,12 +12,9 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
     [HttpPost]
     public async Task<IActionResult> Translate(TranslationRequest translation, CancellationToken cancellationToken)
     {
-        var response = await geminiApiService.TranslateAsync(
-            translation,
-            cancellationToken
-        );
+        var outcome = await geminiApiService.TranslateAsync(translation, cancellationToken);
 
-        switch (response)
+        switch (outcome)
         {
             case TranslationOutcome.Success success:
                 return Ok(new TranslationResponse
@@ -30,43 +27,63 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
                     Tone = translation.Tone,
                     CreatedAt = DateTimeOffset.UtcNow,
                 });
+
+            // 503: الـ quota بتاعتنا خلصت.
             case TranslationOutcome.RateLimited rateLimited:
                 if (rateLimited.RetryAfter is not null)
                     Response.Headers.RetryAfter = ((int)rateLimited.RetryAfter.Value.TotalSeconds).ToString();
                 return Problem(
-                    detail: "The translation request was rate limited. Please try again later.",
+                    detail: "The translation service is temporarily unavailable. Please try again later.",
                     statusCode: StatusCodes.Status503ServiceUnavailable,
                     title: "Service Unavailable"
                 );
+
+            // 500: Gemini رفض الطلب بتاعنا (body مش مظبوط أو key مرفوض).
             case TranslationOutcome.InvalidRequest:
                 return Problem(
-                    detail: "The translation request was invalid. Please check the request parameters.",
+                    detail: "The translation service rejected the request.",
                     statusCode: StatusCodes.Status500InternalServerError,
                     title: "Internal Server Error"
                 );
+
+            // 504:الـ timeout معناه "جرّب تاني ممكن ينفع"،
+            case TranslationOutcome.UpstreamTimeout:
+                return Problem(
+                    detail: "The translation service did not respond in time.",
+                    statusCode: StatusCodes.Status504GatewayTimeout,
+                    title: "Gateway Timeout"
+                );
+
+            // 502: إحنا gateway قدام Gemini، وGemini مردش أو رد برد مش صالح.
             case TranslationOutcome.UpstreamError:
                 return Problem(
-                    detail: "An error occurred while processing the translation request.",
+                    detail: "The translation service returned an invalid response.",
                     statusCode: StatusCodes.Status502BadGateway,
                     title: "Bad Gateway"
                 );
+
+            // 422: الطلب صحيح شكلاً ومفهوم، بس المحتوى نفسه اترفض.
+            // دي الحالة الوحيدة هنا اللي العميل يقدر يتصرف فيها — يغيّر النص، فبنقوله السبب.
             case TranslationOutcome.NotCompleted notCompleted
-                    when notCompleted.FinishReason is GeminiFinishReason.SAFETY or GeminiFinishReason.RECITATION:
+                    when notCompleted.FinishReason is GeminiFinishReason.Safety or GeminiFinishReason.Recitation:
                 return Problem(
-                    detail: $"The translation was not completed. Finish reason: {notCompleted.FinishReason}.",
+                    detail: $"The text could not be translated. Reason: {notCompleted.FinishReason}.",
                     statusCode: StatusCodes.Status422UnprocessableEntity,
                     title: "Unprocessable Entity"
                 );
-            case TranslationOutcome.NotCompleted notCompleted:
+
+            // 500: MaxTokens / Other / Unknown — دي مشاكل في إعدادنا إحنا أو قيمة جديدة من Google.
+            case TranslationOutcome.NotCompleted:
                 return Problem(
-                    detail: $"The translation was not completed. Finish reason: {notCompleted.FinishReason}.",
+                    detail: "The translation could not be completed.",
                     statusCode: StatusCodes.Status500InternalServerError,
                     title: "Internal Server Error"
                 );
+
             default:
                 throw new ArgumentOutOfRangeException(
-                    nameof(response),
-                    response,
+                    nameof(outcome),
+                    outcome,
                     "Unhandled translation outcome.");
         }
     }

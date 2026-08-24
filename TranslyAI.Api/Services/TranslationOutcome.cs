@@ -14,8 +14,13 @@ public abstract record TranslationOutcome
     public sealed record RateLimited(
         TimeSpan? RetryAfter
     ) : TranslationOutcome;
+
     public sealed record InvalidRequest() : TranslationOutcome;
+
     public sealed record UpstreamError() : TranslationOutcome;
+
+    public sealed record UpstreamTimeout() : TranslationOutcome;
+
     public sealed record NotCompleted(
         GeminiFinishReason FinishReason
     ) : TranslationOutcome;

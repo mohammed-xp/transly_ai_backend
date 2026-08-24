@@ -3,7 +3,7 @@
 > ملف الحالة بتاع الـ mentor. بيتقرا في أول كل جلسة وبيتحدث في آخرها.
 > مكانه: `mentor/progress.md` في الريبو بتاع الباك اند.
 
-**آخر تحديث:** 2026-08-19
+**آخر تحديث:** 2026-08-24
 
 ---
 
@@ -47,14 +47,15 @@ enum TranslationEngine { mlKit, ai }
 ## الوضع الحالي
 
 - **Milestone:** AI proxy hardening (بين M2 و M4)
-- **التاسك المفتوحة:** 🚧 **TASK-005** — الـ AI proxy يفشل بصدق (`mentor/tasks/TASK-005.md`، اتفتحت 2026-08-19)
-- **✅ الـ commits اتعملوا** — آخرهم `8fd8a24 refactor: convert translation Tone to enum (TASK-004)`. الـ working tree نضيف.
+- **التاسك المفتوحة:** ✅ **TASK-005 اتقفلت — Approved في r2 (2026-08-24).** التلات blockers اتصلحوا واتحققوا.
+- **⏸️ وقوف مقصود:** بناءً على طلبه الصريح، مفيش TASK-006 لحد ما هو يطلب.
+- **الكوميت:** `fafe894` (r1) + تعديلات r2 **لسه متكوميتش**.
 - **الوقت المتاح أسبوعياً:** ⏳ في انتظار الرد
 
 ### الشغال دلوقتي
 
 - `GET /health` → `status` / `time` / `environment`
-- `POST /v1/translations` → **ترجمة حقيقية من Gemini**. `GeminiApiService` (typed HttpClient) + `GeminiOptions` من user secrets. فشل المزوّد → 502 + الـ status والـ body الحقيقي في الـ log. body ناقص → 400 ProblemDetails مجاناً.
+- `POST /v1/translations` → **ترجمة حقيقية من Gemini** بـ **تصنيف كامل للفشل** (TASK-005): `TranslationOutcome` hierarchy → 503 (quota) · 500 (طلبنا/الـ key مرفوض) · 504 (timeout) · 502 (المزوّد) · 422 (SAFETY/RECITATION) · 500 (MaxTokens/Other/Unknown). الـ key والـ Model بيتحققوا عند الـ startup (`ValidateOnStart`)، Timeout = 15 ثانية في `AddHttpClient`، ومفيش أي `ex.Message` بيوصل للعميل.
 
 ### أسئلة مفتوحة مؤجلة لـ M8
 
@@ -70,7 +71,7 @@ enum TranslationEngine { mlKit, ai }
 | TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | ✅ Done | Approved في r3. الـ contract مطابق حرف بحرف، `required`+`init` على الكل، 400 ProblemDetails مجاناً. الـ rounds الزيادة كانت ملاحظات متطبقتش مش أخطاء كود |
 | TASK-003 | الـ AI proxy الحقيقي — Gemini + typed HttpClient + user secrets | AI proxy | ✅ Done | Approved في r4. الـ boundary اتقفل صح في الآخر، والـ error handling اتاختبر على الحقيقي (503 + 429 من Gemini) وعدّى. الـ rounds التلاتة الأولى كلها كانت **نفس الدرس** بتلات أشكال — مين المسؤول عن معرفة ايه |
 | TASK-004 | `TranslationTone` enum + switch expression + توحيد شكل الخطأ | M2 | ✅ Done | Approved في r2. الشكل العام صح من أول مرة (`_ => throw` مش `_ => ""`، 0 warnings، global converter بـ CamelCase). الـ r1 كانت ثغرة واحدة: `allowIntegerValues` فضل `true` → `"tone": 99` كان بيرجّع 500 + stack trace. اتصلحت واتحققت (99 → 400 ✅، 1 → 400 ✅) |
-| TASK-005 | الـ AI proxy يفشل بصدق — finishReason + تفرقة أنواع الفشل + ValidateOnStart + Timeout | AI proxy | 🚧 مفتوحة | — |
+| TASK-005 | الـ AI proxy يفشل بصدق — finishReason + تفرقة أنواع الفشل + ValidateOnStart + Timeout | AI proxy | ✅ Done (Approved r2) | الشكل المعماري صح: الـ hierarchy مظبوطة، **وعدّى الفخ الأساسي** (503 مش 429) + مرّر `Retry-After` + فرّق timeout عن client-cancel بـ exception filters. الـ blockers: (1) `catch (Exception)` بيرجّع `ex.Message` للعميل وبيعمل mapping موازي للـ hierarchy، (2) الفخ المزروع اتغطى غلط — الـ guard بتاع `candidates` بيمسك `[]` مش الحقل الناقص، (3) الـ acceptance criterion بتاع تعليق "ليه الـ status ده" اتخطى بالكامل + `dotnet format` متشغلش |
 
 ## قرارات معمارية اتاخدت
 
@@ -97,6 +98,9 @@ enum TranslationEngine { mlKit, ai }
 | 19 | نوع حقل `tone` | `enum` + `JsonStringEnumConverter` | `string` + regex/constants/`if` | الفرق مش validation — الفرق مين بيتحمّل المسؤولية. الـ string بيخلي **كل** method تسأل "هي دي قيمة صالحة؟"؛ الـ enum بيسأل مرة واحدة عند الـ binder والباقي بيشتغل على قيمة مضمونة. نفس مبدأ قرار #17. الـ string بيبقى صح بس لو القيم بتيجي من config/DB ومش معروفة وقت الـ compile |
 | 20 | الـ `_` arm في الـ switch expression | `_` بيرمي exception | من غير `_` (نعيش مع CS8509) · `_ => ""` | **enums في C# مش exhaustive زي Dart** — تحتها `int` و`(TranslationTone)99` بيـ compile. الـ binder بيحرس المدخلات الخارجية؛ الـ `_` بيحرس من الكود نفسه (cast غلط، أو عضو enum جديد بعد سنة من غير تعليمة). الـ `_ => ""` هي نفس الـ bug لابسة نوع جديد |
 
+| 21 | فين الـ transport exceptions بتتحول لـ outcome | ✅ **اتطبق في r2** — جوه `GeminiApiService` | `try/catch` في الـ controller (اللي عمله) · `IExceptionHandler` مركزي دلوقتي | الـ return type بتاع `TranslateAsync` بيقول "أنا بقولك كل اللي ممكن يحصل". لو الـ method برضه بترمي، النوع بيكذب والـ compiler مش قادر يساعد. الـ `HttpRequestException`/`TaskCanceledException` بيتولدوا جوه الـ service — يتحولوا لـ vocabulary الـ outcome في نفس المكان. التكلفة لو فضلوا في الـ controller: في M4 بـ 5 endpoints الـ try/catch ده هيتنسخ 5 مرات |
+| 22 | `required` على DTO جاي من مزوّد خارجي | ✅ **اتطبق في r2** — كل الحقول nullable، والـ enum بيتبني من `string?` بـ `MapFinishReason` مع `Unknown` | `required` على كل حقل · `JsonStringEnumConverter` مباشرة على الـ enum | `required` + System.Text.Json = `JsonException` لما الحقل ينقص. ده صح للـ **مدخلات بتاعتنا** (الـ binder بيحوّلها 400 ProblemDetails)، وغلط للـ **ردود المزوّد** — الحقل الناقص هناك مش خطأ عميل، دي حالة معروفة (`promptFeedback.blockReason`) والـ exception بتخبّيها |
+
 ## 🔒 قاعدة ثابتة — Definition of Submitted
 
 > اتفرضت بعد TASK-002 round 1. قبل ما يقول "خلصت" لازم يعدّي التلاتة دول:
@@ -116,13 +120,22 @@ enum TranslationEngine { mlKit, ai }
   - TASK-002 r1 → تلات ملاحظات في رسالة واحدة (`DateTimeOffset` / namespace / `record` mutable)، طبّق واحدة وبعت "خلصت"
   - **التدخّل:** قاعدة "Definition of Submitted" فوق بدل تاسك مخصصة — المشكلة process مش معرفة. هو عارف `DateTimeOffset`، بس مش بيرجع للرسالة.
   - **✅ تحسّن في TASK-003:** طبّق الملاحظات كلها round بعد round، ولما ساب واحدة **قال ليه** (الـ `ApiKey` في `appsettings.json`) — وده بالظبط اللي القاعدة طالباه. القاعدة شغالة، تفضل.
+- 🔴 **بيتخطى acceptance criteria مكتوبة صراحة — تكرار رابع (TASK-005 r1).** الـ ticket طالب "جنب كل status code اكتب سطر تعليق بيقول ليه هو ده" وقال بالنص "لو مفيش سبب، يبقى الاختيار غلط". النتيجة: **صفر تعليقات** في الـ controller. وكمان `dotnet format` متشغلش (بند 3 في Definition of Submitted) — `--verify-no-changes` طلّع ~25 خطأ whitespace في نفس الملف.
+  - **الفرق عن المرات اللي فاتت:** المرات اللي قبلها كانت ملاحظات review سابقة. دي **acceptance criteria في ملف التاسك نفسه** — يعني المشكلة مش "بينسى يرجع للرسالة"، المشكلة إنه **مبيفتحش الـ ticket تاني قبل ما يقول خلصت**.
+  - **الـ criterion ده مكنش شكلي** — التعليق كان الـ mechanism اللي بيه أعرف اختار ولا خمّن. وغيابه بالظبط هو اللي خلّى `InvalidRequest → 500` (اللي بيغطي 400 و403 مع بعض) عدّي من غير ما حد ياخد باله.
+  - **التدخّل المقترح لو اتكرر خامس مرة:** الـ submission ميتقبلش من غير checklist متعبّي — بند بند، وجنب كل واحد لينك للسطر في الكود.
+- 🟡 **بيحط guard في المكان الغلط ويفتكر إنه غطى الحالة — جديدة في TASK-005.** كتب `if (response is null || candidate is null)` وهو فاكر إنها بتغطي "Gemini رجّع 200 من غير candidates". اتحقق عملياً: الحالة دي بترمي `JsonException` جوه `ReadFromJsonAsync` **قبل** ما الـ guard يشتغل أصلاً. الـ guard بيمسك `"candidates": []` بس — حالة تانية خالص.
+  - **مرتبط بنمط قديم:** "بيعتمد على الـ default من غير ما يفتح الـ signature". هنا الشكل الجديد: **بيكتب دفاع من غير ما يتأكد إن المسار بيعدّي عليه**. الـ ticket كان طالب صراحة "مش هقولك الإجابة، جرّبها" — والتجربة مأتمّتش.
 - 🔴 **`DateTime` بدل `DateTimeOffset` — 3 مرات** (TASK-001 r1، TASK-002 r1، وبعد ما اتنبّه في رسالة الـ unblock). القرار #4.
 - 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم — جديدة في TASK-003.** طلعله `CS8604` فخلّى الـ record `string?` عشان الـ warning يسكت، بدل ما يضمن القيمة. **✅ متكررش في TASK-004** — كتب `_ => throw` مش `_ => ""` رغم إن التانية كانت أسهل وكانت هتسكّت `CS8509`. النمط ده اتحسن، يفضل مراقب من بعيد.
 - 🟡 **بيعتمد على الـ default بتاع API من غير ما يفتح الـ signature — جديدة في TASK-004.** كتب `new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)` من غير ما ياخد باله إن فيه parameter تاني `allowIntegerValues` الافتراضي بتاعه `true`. النتيجة: ثغرة 500 + stack trace من مدخل خارجي. **والتاسك كانت طالبة منه صراحة يجرّب `"tone": 1`** وقال إنها هي اللي هتحدد الإجابة — وتخطّاها.
   - **مرتبط بنمط قديم:** "بيتّبع الـ snippets حرفياً من غير ما يسأل بتعمل ايه". الفرق إن هنا الـ snippet كان من دماغه، فالمشكلة أعمق: **الثقة في الـ default من غير قراية**.
   - **التدخّل:** كل تاسك من هنا ورايح فيها "سؤال تجاوب عليه بالتجربة" — سؤال واحد لازم يجاوب عليه برد فعلي مش بافتراض. اتحط في TASK-005.
   - لو اتكرر بعد التدخل ده → تاسك مخصصة: يقرا signature كامل لكل API جديد قبل ما يستعمله.
-- 🟡 **بيتعامل مع الـ guard كأنه العقبة مش الأداة.** عمل comment على `EnsureSuccessStatusCode()` عشان يوقف الـ 500، فخلّى الفشل يعدّي صامت. الغريزة "أشيل اللي بيزعق" بدل "أتصرف في اللي بيزعق منه".
+- 🟡 **بيعمل comment على الكود بدل ما يمسحه — تكرار تاني (TASK-005 r2).** الأولى: comment على `EnsureSuccessStatusCode()` عشان يوقف الـ 500، فخلّى الفشل يعدّي صامت — الغريزة "أشيل اللي بيزعق" بدل "أتصرف في اللي بيزعق منه". التانية: `// [JsonConverter(typeof(JsonStringEnumConverter))]` في `GeminiResponseDto` سابها comment بدل ما يمسحها.
+  - **الفرق بين المرتين:** الأولى كانت خطر حقيقي (فشل صامت)، التانية نص ميّت مش أكتر. بس **الغريزة واحدة** — التردد في الحذف.
+  - **الرد:** الـ git هو الـ history. سطر متعلّق عليه comment من غير تاريخ ولا سبب بيخلي اللي بعدك يقف يفكر "ده اتشال ليه؟ ينفع يرجع؟" — والإجابة موجودة في `git log` أنضف مليون مرة.
+  - لو اتكرر تالت مرة → تاسك مخصصة.
 - بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
 - بيصلّح الملاحظة في مكان واحد ويسيب المكان التاني المطابق (صلّح `TranslationRequest` وساب `TranslationResponse`)
 - ميل واضح لنقل Clean Architecture من الـ Flutter كما هي (عمل 3 فولدرات layers قبل ما يكتب endpoint واحد) — استجاب للـ pushback من غير جدال
@@ -139,6 +152,7 @@ enum TranslationEngine { mlKit, ai }
 - عنده تمارين .NET قديمة في `source/repos` (HR.LeaveManagement, BookStoreApp, MyFirstApi) — لسه محتاجين نعرف وصل فيها لفين
 - **بيعترض بحجة لما يكون معاه حق (TASK-003).** رفض يشيل `ApiKey` من `appsettings.json` وقال السبب: توثيق شكل الـ configuration + مفيش حد تاني على المشروع. حجة سليمة واتقبلت. **درس للـ mentor:** متعلّقش ملاحظة process كبيرة على أضعف نقطة في الليستة — ده بيحوّل النقاش عن الموضوع.
 - **بيوصل للحل الصح لو الشرح فيه "ليه" مش "ايه".** في TASK-003 محتاج 4 rounds، بس كل round كان بيتحرك خطوة حقيقية لما السبب اتشرح بمثال عملي (سيناريو 429) بدل قاعدة مجردة.
+- **🔺 عدّى الفخ المقصود في TASK-005 من غير تلميح.** الـ ticket زرع إغراء صريح يرجّع **429** على نفاد الـ Gemini quota وحذّر منه بفقرة كاملة — واختار **503 + `Retry-After`** ومرّر الـ `Delta` الجاي من Gemini. ده أهم اختبار في التاسك وعدّاه. كمان فرّق الـ timeout بتاعنا (504) عن قطع العميل (499) بـ **exception filters** (`when`) — ميكانيكية C# مش بديهية لواحد جاي من Dart، ومحدش قاله عليها.
 - **🔺 بيقرا الـ ticket بعين ناقدة قبل ما ينفّذ — تصاعد واضح (2026-08-20).** على TASK-005 اعترض على حاجتين قبل ما يكتب سطر: (1) الجزء أ "تفاصيل غير مهمة" — **صح جزئياً**، تثبيت الموديل اتشال من التاسك؛ (2) **"مش هنعمل Global Error Handler في M4؟ ليه نفترض إنه مش موجود ونعمل hierarchy؟"** — دي لقطة حقيقية، الـ decision block كان عدّد البدائل من غير ما يحسب إن `IExceptionHandler` جاي قريب. اتضاف قسم رد كامل في الـ ticket.
   - **الفرق عن الاعتراضات اللي قبلها:** الأولانيين (`/api/v1`، `api.transly.ai`) كانوا أسئلة عن معلومة ناقصة. ده اعتراض على **الـ sequencing المعماري** — بيقارن التاسك بخريطة الـ milestones ويسأل عن الازدواج. ده تفكير tech lead مش junior.
   - **درس للـ mentor:** تسمية "تسخين" على بنود الجزء أ هي اللي خلّتهم يبانوا زي التنضيف. **التسمية جزء من الـ ticket** — لو البند مدخل للشغل الأساسي، اسمه ميقولش إنه جانبي.
@@ -174,7 +188,25 @@ enum TranslationEngine { mlKit, ai }
 
 ## الجلسة الجاية
 
-**TASK-005 مفتوحة ومكتوبة** — `mentor/tasks/TASK-005.md`. الـ ticket اتكتب 2026-08-19 بعد ما اتأكدت إن TASK-004 متكوميت والـ tree نضيف.
+**✅ TASK-005 اتقفلت — Approved في r2 (2026-08-24).** التلات blockers اتصلحوا كلهم، والفخ المزروع اتحقق منه بتجربة فعلية (5 حالات JSON، صفر exceptions).
+
+**⚠️ فاضل حاجتين قبل الكوميت:**
+1. `dotnet run` + طلب 200 حقيقي واحد — الـ `GeminiOptions` اتغيّرت (شيل `= string.Empty`) فالـ startup path اتمس، والـ DoD الأصلي اتحقق منه على كود r1 مش r2.
+2. تعديلات r2 لسه في الـ working tree من غير commit.
+
+**🟡 ملاحظات r2 (مش blockers — اتقالتله وهو حر فيها):**
+- `// [JsonConverter(...)]` في `GeminiResponseDto` اتعمللها comment بدل ما تتمسح — شوف مفكرة الـ mentor.
+- التعليقات في الـ controller احتفظت بالـ "إيه" وضاع منها الـ "مش إيه": `// 503: الـ quota خلصت` من غير "مش 429 لأن...". النص المفقود ده هو **الوحيد** اللي بيمنع حد يرجّعها 429 بعد سنة.
+- `// 504:` اتقصّت في النص وسايبة فاصلة في آخرها.
+- `HttpResponseMessage` مش بيتعمله dispose (كان في الـ snippet بتاعي كمان — غلطتي).
+
+**✅ إجابات الجزء ج اتقبلت (2026-08-24):**
+- **س1:** الافتراضي **100 ثانية**، حطها **15**، والنوع `TaskCanceledException`. والجزء التاني من السؤال (ليه النوع ده مشكلة وانت ماسك `CancellationToken`) **جاوبه في الكود مش بالكلام** — `when (!cancellationToken.IsCancellationRequested)` عشان يفرّق الـ timeout بتاعنا عن إن العميل هو اللي قطع. إجابة صح.
+- **س2 (دين TASK-004 — اتقفل):** الـ response بيرجّع **`"casual"`** بالـ camelCase. يعني الـ `JsonStringEnumConverter(CamelCase)` شغال على الخرج، **والـ parse عند تطبيق الفلاتر مش هيكسر**. الدين ده اتشال.
+
+---
+
+**الـ ticket الأصلي** — `mentor/tasks/TASK-005.md`، اتكتب 2026-08-19.
 
 **محتوى TASK-005 باختصار:** تفعيل قرار #16 — الـ `null` الواحد بيتحوّل لـ `sealed record` hierarchy بيفرّق بين quota / key غلط / المزوّد واقع / `finishReason != STOP`، وكل حالة ليها status code. جنبها: `ValidateOnStart` للـ key + Timeout صريح.
 
@@ -184,7 +216,7 @@ enum TranslationEngine { mlKit, ai }
 - **429 مش الإجابة للـ quota** — لو اتحرقت دلوقتي، مش هيبقى فيه كود يقول "**انت** خلصت رصيدك" في M5. التاسك بتحذّر منه صراحة، فلو اختارها برضه يبقى مقراش.
 - **`GeminiResponseDto.Candidates` معرّفة `required`** — و Gemini بيرجّع 200 من غير `candidates` لما الـ prompt يتحجب → `JsonException` غير ممسوكة → 500. اتزرع كسؤال مش كتعليمة.
 
-**⚠️ دين تحقق مفتوح من TASK-004 (اتنقل جوه TASK-005 كـ س2):** الـ response بيرجّع `"casual"` ولا `"Casual"`؟ **متحقق منه هو، مش مني** — الـ Gemini quota كانت خلصانة وقت الـ review فكل المحاولات رجعت 502.
+**✅ دين التحقق بتاع TASK-004 اتقفل** — `"casual"` camelCase، شوف قسم "إجابات الجزء ج" فوق.
 
 **⚠️ عايق مطروح عليه في التاسك:** الـ free tier 20/يوم مش كفاية لتجربة TASK-005 (200 + عدة حالات فشل). اتطلب منه يقرر الـ paid tier قبل ما يبدأ الجزء ب.
 
