@@ -10,21 +10,26 @@ namespace TranslyAI.Api.Controllers;
 public class TranslationsController(GeminiApiService geminiApiService) : ControllerBase
 {
     [HttpPost]
-    public async Task<IActionResult> Translate(TranslationRequest translation, CancellationToken cancellationToken)
+    public async Task<ActionResult<TranslationResponse>> Translate(TranslationRequest translation, CancellationToken cancellationToken)
     {
-        var outcome = await geminiApiService.TranslateAsync(translation, cancellationToken);
+        var request = translation with
+        {
+            SourceLanguage = LanguageCatalog.Get(translation.SourceLanguage).Code,
+            TargetLanguage = LanguageCatalog.Get(translation.TargetLanguage).Code,
+        };
+        var outcome = await geminiApiService.TranslateAsync(request, cancellationToken);
 
         switch (outcome)
         {
             case TranslationOutcome.Success success:
                 return Ok(new TranslationResponse
                 {
-                    SourceText = translation.Text,
+                    SourceText = request.Text,
                     TranslatedText = success.Text,
-                    SourceLanguage = translation.SourceLanguage,
-                    TargetLanguage = translation.TargetLanguage,
+                    SourceLanguage = request.SourceLanguage,
+                    TargetLanguage = request.TargetLanguage,
                     Model = success.ModelVersion,
-                    Tone = translation.Tone,
+                    Tone = request.Tone,
                     CreatedAt = DateTimeOffset.UtcNow,
                 });
 
