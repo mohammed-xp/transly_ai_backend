@@ -8,7 +8,7 @@ public abstract record TranslationOutcome
 
     public sealed record Success(
         string Text,
-        string ModelVersion
+        string Model
     ) : TranslationOutcome;
 
     public sealed record RateLimited(
@@ -22,6 +22,6 @@ public abstract record TranslationOutcome
     public sealed record UpstreamTimeout() : TranslationOutcome;
 
     public sealed record NotCompleted(
-        GeminiFinishReason FinishReason
+        GeminiInteractionStatus Status
     ) : TranslationOutcome;
 }

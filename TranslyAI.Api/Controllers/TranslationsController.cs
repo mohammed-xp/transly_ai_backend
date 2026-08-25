@@ -28,7 +28,7 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
                     TranslatedText = success.Text,
                     SourceLanguage = request.SourceLanguage,
                     TargetLanguage = request.TargetLanguage,
-                    Model = success.ModelVersion,
+                    Model = success.Model,
                     Tone = request.Tone,
                     CreatedAt = DateTimeOffset.UtcNow,
                 });
@@ -69,20 +69,41 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
 
             // 422: الطلب صحيح شكلاً ومفهوم، بس المحتوى نفسه اترفض.
             // دي الحالة الوحيدة هنا اللي العميل يقدر يتصرف فيها — يغيّر النص، فبنقوله السبب.
+            // case TranslationOutcome.NotCompleted notCompleted
+            //         when notCompleted.FinishReason is GeminiFinishReason.Safety or GeminiFinishReason.Recitation:
+            //     return Problem(
+            //         detail: $"The text could not be translated. Reason: {notCompleted.FinishReason}.",
+            //         statusCode: StatusCodes.Status422UnprocessableEntity,
+            //         title: "Unprocessable Entity"
+            //     );
+
+            // 504: الـ interaction لسه شغالة عند Gemini وإحنا مش بنعمل polling.
+            //      "جرّب تاني" إجابة صادقة — على عكس 502 اللي معناها المزوّد بايظ.
             case TranslationOutcome.NotCompleted notCompleted
-                    when notCompleted.FinishReason is GeminiFinishReason.Safety or GeminiFinishReason.Recitation:
+                    when notCompleted.Status is GeminiInteractionStatus.Queued or GeminiInteractionStatus.InProgress:
                 return Problem(
-                    detail: $"The text could not be translated. Reason: {notCompleted.FinishReason}.",
-                    statusCode: StatusCodes.Status422UnprocessableEntity,
-                    title: "Unprocessable Entity"
+                    detail: "The translation service did not finish in time.",
+                    statusCode: StatusCodes.Status504GatewayTimeout,
+                    title: "Gateway Timeout"
                 );
 
-            // 500: MaxTokens / Other / Unknown — دي مشاكل في إعدادنا إحنا أو قيمة جديدة من Google.
-            case TranslationOutcome.NotCompleted:
+            // 500: الرد اتقطع (max tokens غالباً) — ده حد إعدادنا إحنا، مش غلطة العميل.
+            case TranslationOutcome.NotCompleted notCompleted
+                    when notCompleted.Status is GeminiInteractionStatus.Incomplete:
                 return Problem(
                     detail: "The translation could not be completed.",
                     statusCode: StatusCodes.Status500InternalServerError,
                     title: "Internal Server Error"
+                );
+
+            // 502: failed / cancelled / unknown — المزوّد وقع أو رجّع حاجة مش فاهمينها.
+            // ⚠️ دَين: الـ 422 بتاعت الحجب (SAFETY) اتشالت — مالهاش مصدر موثّق في الـ API
+            //         الجديدة. الـ errors[] بتتسجّل خام لحد ما نشوف حالة حقيقية.
+            case TranslationOutcome.NotCompleted:
+                return Problem(
+                    detail: "The translation service returned an unexpected result.",
+                    statusCode: StatusCodes.Status502BadGateway,
+                    title: "Bad Gateway"
                 );
 
             default:

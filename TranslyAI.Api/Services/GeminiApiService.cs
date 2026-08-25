@@ -48,24 +48,16 @@ public class GeminiApiService
 
         var geminiRequestDto = new GeminiRequestDto
         {
-            Contents = [
-                new GeminiRequestContent
-                {
-                    Parts = [
-                        new GeminiRequestPart
-                        {
-                            Text = prompt,
-                        }
-                    ]
-                }
-            ]
+            Input = prompt,
+            Model = _options.Model,
+            Store = false,
         };
 
         HttpResponseMessage httpResponse;
         try
         {
             httpResponse = await _httpClient.PostAsJsonAsync(
-                $"v1beta/models/{_options.Model}:generateContent",
+                "v1beta/interactions",
                 geminiRequestDto,
                 cancellationToken
             );
@@ -118,47 +110,72 @@ public class GeminiApiService
                 return new TranslationOutcome.UpstreamError();
             }
 
-            var candidate = response.Candidates?.FirstOrDefault();
+            var status = MapStatus(response.Status);
 
-            if (candidate is null)
-            {
-                _logger.LogError("Gemini returned 200 with no candidates — the prompt was most likely blocked.");
-                return new TranslationOutcome.UpstreamError();
-            }
-
-            var finishReason = MapFinishReason(candidate.FinishReason);
-
-            if (finishReason == GeminiFinishReason.Unknown)
+            if (status == GeminiInteractionStatus.Unknown)
             {
                 _logger.LogWarning(
-                    "Gemini returned an unrecognised finishReason: {Raw}. GeminiFinishReason may need a new member.",
-                    candidate.FinishReason);
+                    "Gemini returned an unrecognised status: {Raw}. InteractionStatus may need a new member.",
+                    response.Status);
             }
 
-            if (finishReason != GeminiFinishReason.Stop)
+            if (status != GeminiInteractionStatus.Completed)
             {
-                _logger.LogError("Gemini stopped early. finishReason: {Raw}", candidate.FinishReason);
-                return new TranslationOutcome.NotCompleted(finishReason);
+                _logger.LogError(
+                   "Interaction did not complete. status: {Status}, errors: {Errors}",
+                   response.Status,
+                   response.Errors is null ? "(none)" : JsonSerializer.Serialize(response.Errors));
+
+                return status switch
+                {
+                    GeminiInteractionStatus.BudgetExceeded => new TranslationOutcome.RateLimited(RetryAfter: null),
+                    GeminiInteractionStatus.RequiresAction => new TranslationOutcome.InvalidRequest(),
+                    _ => new TranslationOutcome.NotCompleted(status),
+
+                };
             }
 
-            var translatedText = candidate.Content?.Parts?.FirstOrDefault()?.Text;
+            var translatedText = ExtractText(response.Steps);
 
-            if (string.IsNullOrWhiteSpace(translatedText) || string.IsNullOrWhiteSpace(response.ModelVersion))
+            if (string.IsNullOrWhiteSpace(translatedText) || string.IsNullOrWhiteSpace(response.Model))
             {
-                _logger.LogError("Gemini returned STOP but no usable text or modelVersion.");
+                _logger.LogError(
+                    "Interaction completed but returned no usable text or model."
+                );
                 return new TranslationOutcome.UpstreamError();
             }
-            return new TranslationOutcome.Success(translatedText, response.ModelVersion);
+
+            return new TranslationOutcome.Success(translatedText, response.Model);
         }
     }
 
-    private static GeminiFinishReason MapFinishReason(string? raw) => raw switch
+    private static string? ExtractText(List<InteractionStep>? steps)
     {
-        "STOP" => GeminiFinishReason.Stop,
-        "MAX_TOKENS" => GeminiFinishReason.MaxTokens,
-        "SAFETY" => GeminiFinishReason.Safety,
-        "RECITATION" => GeminiFinishReason.Recitation,
-        "OTHER" => GeminiFinishReason.Other,
-        _ => GeminiFinishReason.Unknown,
+        if (steps is null)
+        {
+            return null;
+        }
+
+        var text = string.Concat(
+            steps.Where(step => step.Type == "model_output")
+                .SelectMany(step => step.Content ?? [])
+                .Where(item => item.Type == "text" && !string.IsNullOrEmpty(item.Text))
+                .Select(item => item.Text!)
+        );
+
+        return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
+
+    private static GeminiInteractionStatus MapStatus(string? raw) => raw switch
+    {
+        "queued" => GeminiInteractionStatus.Queued,
+        "in_progress" => GeminiInteractionStatus.InProgress,
+        "requires_action" => GeminiInteractionStatus.RequiresAction,
+        "completed" => GeminiInteractionStatus.Completed,
+        "failed" => GeminiInteractionStatus.Failed,
+        "cancelled" => GeminiInteractionStatus.Cancelled,
+        "incomplete" => GeminiInteractionStatus.Incomplete,
+        "budget_exceeded" => GeminiInteractionStatus.BudgetExceeded,
+        _ => GeminiInteractionStatus.Unknown,
     };
 }
