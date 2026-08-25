@@ -1,12 +1,16 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+{
+    options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
+})
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(

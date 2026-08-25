@@ -81,72 +81,75 @@ public class GeminiApiService
             return new TranslationOutcome.UpstreamError();
         }
 
-        if (!httpResponse.IsSuccessStatusCode)
+        using (httpResponse)
         {
-            var errorBody = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogError("Gemini returned {Status}: {Body}", (int)httpResponse.StatusCode, errorBody);
 
-            return httpResponse.StatusCode switch
+            if (!httpResponse.IsSuccessStatusCode)
             {
-                HttpStatusCode.TooManyRequests => new TranslationOutcome.RateLimited(
-                    RetryAfter: httpResponse.Headers.RetryAfter?.Delta
-                ),
-                HttpStatusCode.BadRequest
-                    or HttpStatusCode.Unauthorized
-                    or HttpStatusCode.Forbidden => new TranslationOutcome.InvalidRequest(),
-                _ => new TranslationOutcome.UpstreamError(),
-            };
+                var errorBody = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("Gemini returned {Status}: {Body}", (int)httpResponse.StatusCode, errorBody);
+
+                return httpResponse.StatusCode switch
+                {
+                    HttpStatusCode.TooManyRequests => new TranslationOutcome.RateLimited(
+                        RetryAfter: httpResponse.Headers.RetryAfter?.Delta
+                    ),
+                    HttpStatusCode.BadRequest
+                        or HttpStatusCode.Unauthorized
+                        or HttpStatusCode.Forbidden => new TranslationOutcome.InvalidRequest(),
+                    _ => new TranslationOutcome.UpstreamError(),
+                };
+            }
+
+            GeminiResponseDto? response;
+            try
+            {
+                response = await httpResponse.Content.ReadFromJsonAsync<GeminiResponseDto>(cancellationToken);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Gemini returned a body that is not valid JSON.");
+                return new TranslationOutcome.UpstreamError();
+            }
+
+            if (response is null)
+            {
+                _logger.LogError("Gemini returned an empty body.");
+                return new TranslationOutcome.UpstreamError();
+            }
+
+            var candidate = response.Candidates?.FirstOrDefault();
+
+            if (candidate is null)
+            {
+                _logger.LogError("Gemini returned 200 with no candidates — the prompt was most likely blocked.");
+                return new TranslationOutcome.UpstreamError();
+            }
+
+            var finishReason = MapFinishReason(candidate.FinishReason);
+
+            if (finishReason == GeminiFinishReason.Unknown)
+            {
+                _logger.LogWarning(
+                    "Gemini returned an unrecognised finishReason: {Raw}. GeminiFinishReason may need a new member.",
+                    candidate.FinishReason);
+            }
+
+            if (finishReason != GeminiFinishReason.Stop)
+            {
+                _logger.LogError("Gemini stopped early. finishReason: {Raw}", candidate.FinishReason);
+                return new TranslationOutcome.NotCompleted(finishReason);
+            }
+
+            var translatedText = candidate.Content?.Parts?.FirstOrDefault()?.Text;
+
+            if (string.IsNullOrWhiteSpace(translatedText) || string.IsNullOrWhiteSpace(response.ModelVersion))
+            {
+                _logger.LogError("Gemini returned STOP but no usable text or modelVersion.");
+                return new TranslationOutcome.UpstreamError();
+            }
+            return new TranslationOutcome.Success(translatedText, response.ModelVersion);
         }
-
-        GeminiResponseDto? response;
-        try
-        {
-            response = await httpResponse.Content.ReadFromJsonAsync<GeminiResponseDto>(cancellationToken);
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogError(ex, "Gemini returned a body that is not valid JSON.");
-            return new TranslationOutcome.UpstreamError();
-        }
-
-        if (response is null)
-        {
-            _logger.LogError("Gemini returned an empty body.");
-            return new TranslationOutcome.UpstreamError();
-        }
-
-        var candidate = response.Candidates?.FirstOrDefault();
-
-        if (candidate is null)
-        {
-            _logger.LogError("Gemini returned 200 with no candidates — the prompt was most likely blocked.");
-            return new TranslationOutcome.UpstreamError();
-        }
-
-        var finishReason = MapFinishReason(candidate.FinishReason);
-
-        if (finishReason == GeminiFinishReason.Unknown)
-        {
-            _logger.LogWarning(
-                "Gemini returned an unrecognised finishReason: {Raw}. GeminiFinishReason may need a new member.",
-                candidate.FinishReason);
-        }
-
-        if (finishReason != GeminiFinishReason.Stop)
-        {
-            _logger.LogError("Gemini stopped early. finishReason: {Raw}", candidate.FinishReason);
-            return new TranslationOutcome.NotCompleted(finishReason);
-        }
-
-        var translatedText = candidate.Content?.Parts?.FirstOrDefault()?.Text;
-
-        if (string.IsNullOrWhiteSpace(translatedText) || string.IsNullOrWhiteSpace(response.ModelVersion))
-        {
-            _logger.LogError("Gemini returned STOP but no usable text or modelVersion.");
-            return new TranslationOutcome.UpstreamError();
-        }
-
-        return new TranslationOutcome.Success(translatedText, response.ModelVersion);
     }
 
     private static GeminiFinishReason MapFinishReason(string? raw) => raw switch

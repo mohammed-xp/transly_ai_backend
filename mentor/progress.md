@@ -56,8 +56,45 @@ enum TranslationEngine { mlKit, ai }
 ## الوضع الحالي
 
 - **Milestone:** M2 — أول endpoints
-- **التاسك المفتوحة:** 🎫 **TASK-006 — `GET /v1/languages` + رفض اللغات غير المدعومة** (اتكتبت 2026-08-24، `mentor/tasks/TASK-006.md`)
-- **الكوميت الأخير:** `62f7bea` — الـ working tree نضيف
+- **التاسك المفتوحة:** ✅ **TASK-006 اتقفلت — Approved في r2 (2026-08-25)** مع دين مؤجل بقراره (تحت)
+- **الكوميت:** `0224a54` (الجسم الأساسي) + تعديلات r2 (`using (httpResponse)` + `SystemTextJsonValidationMetadataProvider`) **لسه متكوميتوش**
+- **✅ متحقق عملياً (2026-08-25):** `GET /v1/languages` → 200 + `Cache-Control: public,max-age=3600` · `banana` → 400 بمفتاح `sourceLanguage` · `""` → 400 · `en → en` → **400** · **صفر** استدعاءات Gemini في كل الحالات · build 0 warnings · `dotnet format` نضيف.
+- **⏸️ وقوف:** مفيش TASK-007 لحد ما هو يطلب.
+
+### 💳 دين معلوم — مؤجل بقرار صريح منه (2026-08-25)
+
+> قال **"مش عايز اعمل التعديلات الباقية"** بعد ما الـ blockers الاتنين اتقفلوا. **دي مش بنود متخطّاة** — دي تأجيل واعي بعد ما اتعرضت عليه بتكلفتها. ماتتحسبش عليه في مفكرة الأنماط.
+
+| # | البند | المكان | التكلفة الحقيقية |
+|---|---|---|---|
+| 1 | مفتاح الخطأ `TargetLanguage` بالـ PascalCase | `TranslationRequest.cs:27` | `nameof` بيدي اسم الـ C#، والـ `SystemTextJsonValidationMetadataProvider` **مبيمسّش** الـ `memberNames` اللي بتتسلّم يدوي في `IValidatableObject`. النتيجة: نفس الـ endpoint بيرجّع `sourceLanguage` camelCase و `TargetLanguage` PascalCase. الحل: نص صريح `["targetLanguage"]` |
+| 2 | typo `"differnt"` | `TranslationRequest.cs:26` | ظاهر في response حقيقي |
+| 3 | تعليق `// 504:` مقصوص | `TranslationsController.cs:54` | داخلي |
+| 4 | `[AttributeUsage(AttributeTargets.Property)]` ناقصة | `SupportedLanguageAttribute.cs` | داخلي |
+| 5 | سطر فاضي زيادة بعد `using (httpResponse) {` | `GeminiApiService.cs:86` | تجميل |
+
+**البند 1 هو الوحيد اللي ليه أثر على الـ contract** — يترجعله مع M4 (توحيد شكل الأخطاء) على أبعد تقدير.
+
+**🔎 اكتشاف تقني يتسجّل:** الـ `SystemTextJsonValidationMetadataProvider` بيصلّح مفاتيح الأخطاء الجاية من `ValidationAttribute` **بس**. الأخطاء الجاية من `IValidatableObject` بتتسلّم مفتاحها يدوي فبتعدّي من غير mapping. وكمان: الـ constructor الفاضي بتاعه **بيحط CamelCase ثابتة جواه**، مش بيقرا `JsonSerializerOptions.PropertyNamingPolicy` — يعني قرار التسمية مكتوب في مكانين مستقلين ومحدش هيحذّرك لو اتفرّقوا.
+
+### 🆕 اكتشاف كبير منه (2026-08-25) — Gemini Interactions API
+
+راح قرا توثيق Google من نفسه ولقى إن **`generateContent` مبقتش المستحسنة**: الـ **Interactions API** بقت GA و Google بتقول بالنص إنها الـ recommended standard primitive لأي مشروع جديد. **المعلومة دي كانت غايبة عني** — اتأكدت منها وهو صح.
+
+| القديم | الجديد |
+|---|---|
+| `POST v1beta/models/{model}:generateContent` بـ `{contents:[...]}` | `POST v1beta/interactions` بـ `{model, input}` |
+| `candidates[0].content.parts[]` | `steps[].content[]` (جوه step نوعه `model_output`) |
+| `finishReason` | `status` على الـ step |
+| `modelVersion` | **مش موجود** |
+| `usageMetadata.promptTokenCount` | `usage.prompt_tokens` (snake_case) |
+
+⚠️ **breaking changes مايو 2026:** الـ `outputs` array اتشال لصالح `steps`، والـ legacy schema اتحذف 8 يونيو 2026 — يعني أي مثال قديم على النت بايظ.
+📎 [migrate-to-interactions](https://ai.google.dev/gemini-api/docs/migrate-to-interactions) · [interactions-overview](https://ai.google.dev/gemini-api/docs/interactions-overview) · [breaking-changes-may-2026](https://ai.google.dev/gemini-api/docs/interactions-breaking-changes-may-2026)
+
+**اتفصلت عن TASK-006 بقرار مني** (كانت هتخلي التاسكين غير قابلين للمراجعة) → بقت **TASK-007**. هو رجّع الملف نضيف من غير جدال.
+
+**🔴 قرار #18 اتكسر بسببها:** مفيش `modelVersion` في الرد الجديد، يعني حقل `model` في `TranslationResponse` مالوش مصدر. القرار لازم **يتفتح تاني في TASK-007**، ولو الإجابة بقت `_options.Model` يبقى **تثبيت اسم الموديل** (المؤجل لـ M8) بقى ألزم مش أقل.
 - **الوقت المتاح أسبوعياً:** ⏳ في انتظار الرد
 
 ### الشغال دلوقتي
@@ -135,6 +172,11 @@ enum TranslationEngine { mlKit, ai }
   - **التدخّل المقترح لو اتكرر خامس مرة:** الـ submission ميتقبلش من غير checklist متعبّي — بند بند، وجنب كل واحد لينك للسطر في الكود.
 - 🟡 **بيحط guard في المكان الغلط ويفتكر إنه غطى الحالة — جديدة في TASK-005.** كتب `if (response is null || candidate is null)` وهو فاكر إنها بتغطي "Gemini رجّع 200 من غير candidates". اتحقق عملياً: الحالة دي بترمي `JsonException` جوه `ReadFromJsonAsync` **قبل** ما الـ guard يشتغل أصلاً. الـ guard بيمسك `"candidates": []` بس — حالة تانية خالص.
   - **مرتبط بنمط قديم:** "بيعتمد على الـ default من غير ما يفتح الـ signature". هنا الشكل الجديد: **بيكتب دفاع من غير ما يتأكد إن المسار بيعدّي عليه**. الـ ticket كان طالب صراحة "مش هقولك الإجابة، جرّبها" — والتجربة مأتمّتش.
+- 🔴 **بيخلط بين "أملك" و"مستعير" في الـ `IDisposable` — جديدة في TASK-006 r1.** الملاحظة كانت: `HttpResponseMessage` جوه `TranslateAsync` مش بيتعمله dispose. اللي عمله: `GeminiApiService : IDisposable` + `_httpClient.Dispose()`. يعني **عمل dispose لحاجة الـ DI أداهاله، وساب الحاجة اللي هو عملها.**
+  - **الأثر الحقيقي:** `_httpClient.Dispose()` مش بيعمل حاجة أصلاً (الـ factory بتلف الـ handler في `LifetimeTrackingHttpMessageHandler` والـ `Dispose` بتاعه no-op) — فهو مش خطر، هو **صفر**. والـ `HttpResponseMessage` لسه مسايب. وكمان `: IDisposable` بقى ادعاء عام في الـ type مش وراه حاجة.
+  - **القاعدة اللي المفروض تفضل:** dispose اللي **انت** عملته، مش اللي **اتداهولك**.
+  - **الأخطر:** الكود الكامل للحل كان **متبعتله حرفياً** في رسالة "ساعدني" (`using (httpResponse) { ... }`) — يعني المشكلة مش معرفة، دي إنه اشتغل من فهمه للعنوان مش من نص الملاحظة.
+  - مرتبط بنمط "بيحط guard في المكان الغلط" — نفس الشكل: **إجراء صح على هدف غلط**.
 - 🔴 **`DateTime` بدل `DateTimeOffset` — 3 مرات** (TASK-001 r1، TASK-002 r1، وبعد ما اتنبّه في رسالة الـ unblock). القرار #4.
 - 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم — جديدة في TASK-003.** طلعله `CS8604` فخلّى الـ record `string?` عشان الـ warning يسكت، بدل ما يضمن القيمة. **✅ متكررش في TASK-004** — كتب `_ => throw` مش `_ => ""` رغم إن التانية كانت أسهل وكانت هتسكّت `CS8509`. النمط ده اتحسن، يفضل مراقب من بعيد.
 - 🟡 **بيعتمد على الـ default بتاع API من غير ما يفتح الـ signature — جديدة في TASK-004.** كتب `new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)` من غير ما ياخد باله إن فيه parameter تاني `allowIntegerValues` الافتراضي بتاعه `true`. النتيجة: ثغرة 500 + stack trace من مدخل خارجي. **والتاسك كانت طالبة منه صراحة يجرّب `"tone": 1`** وقال إنها هي اللي هتحدد الإجابة — وتخطّاها.
@@ -162,6 +204,9 @@ enum TranslationEngine { mlKit, ai }
 - **بيعترض بحجة لما يكون معاه حق (TASK-003).** رفض يشيل `ApiKey` من `appsettings.json` وقال السبب: توثيق شكل الـ configuration + مفيش حد تاني على المشروع. حجة سليمة واتقبلت. **درس للـ mentor:** متعلّقش ملاحظة process كبيرة على أضعف نقطة في الليستة — ده بيحوّل النقاش عن الموضوع.
 - **بيوصل للحل الصح لو الشرح فيه "ليه" مش "ايه".** في TASK-003 محتاج 4 rounds، بس كل round كان بيتحرك خطوة حقيقية لما السبب اتشرح بمثال عملي (سيناريو 429) بدل قاعدة مجردة.
 - **🔺 عدّى الفخ المقصود في TASK-005 من غير تلميح.** الـ ticket زرع إغراء صريح يرجّع **429** على نفاد الـ Gemini quota وحذّر منه بفقرة كاملة — واختار **503 + `Retry-After`** ومرّر الـ `Delta` الجاي من Gemini. ده أهم اختبار في التاسك وعدّاه. كمان فرّق الـ timeout بتاعنا (504) عن قطع العميل (499) بـ **exception filters** (`when`) — ميكانيكية C# مش بديهية لواحد جاي من Dart، ومحدش قاله عليها.
+- **🔺🔺 راح لتوثيق المزوّد من نفسه ولقى حاجة الـ mentor مكنش يعرفها (2026-08-25).** اكتشف إن `generateContent` مبقتش المستحسنة وإن الـ Interactions API بقت GA — من غير ما حد يوجهه، وغيّر الكود على أساسها. **الاكتشاف صح واتأكد.** ده أعلى مستوى وصله لحد دلوقتي: مش بيقرا الـ ticket بعين ناقدة بس، بقى بيتحقق من **الافتراضات اللي الـ ticket نفسه مبني عليها**.
+  - **اللي كان ناقص:** غيّر الـ request وساب الـ response — والنتيجة كانت هتبقى **502 على كل ترجمة ناجحة في صمت**. الاكتشاف ممتاز، الهجرة نصها. الدرس: **تغيير الـ API مش تغيير endpoint — هو تغيير الـ contract بالكامل، الاتجاهين.**
+  - **واستجاب للفصل من غير جدال** لما اتقاله إن ده TASK-007 مش TASK-006.
 - **🔺 بيقرا الـ ticket بعين ناقدة قبل ما ينفّذ — تصاعد واضح (2026-08-20).** على TASK-005 اعترض على حاجتين قبل ما يكتب سطر: (1) الجزء أ "تفاصيل غير مهمة" — **صح جزئياً**، تثبيت الموديل اتشال من التاسك؛ (2) **"مش هنعمل Global Error Handler في M4؟ ليه نفترض إنه مش موجود ونعمل hierarchy؟"** — دي لقطة حقيقية، الـ decision block كان عدّد البدائل من غير ما يحسب إن `IExceptionHandler` جاي قريب. اتضاف قسم رد كامل في الـ ticket.
   - **الفرق عن الاعتراضات اللي قبلها:** الأولانيين (`/api/v1`، `api.transly.ai`) كانوا أسئلة عن معلومة ناقصة. ده اعتراض على **الـ sequencing المعماري** — بيقارن التاسك بخريطة الـ milestones ويسأل عن الازدواج. ده تفكير tech lead مش junior.
   - **درس للـ mentor:** تسمية "تسخين" على بنود الجزء أ هي اللي خلّتهم يبانوا زي التنضيف. **التسمية جزء من الـ ticket** — لو البند مدخل للشغل الأساسي، اسمه ميقولش إنه جانبي.

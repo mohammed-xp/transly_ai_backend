@@ -24,7 +24,7 @@ public record TranslationRequest : IValidatableObject
         {
             yield return new ValidationResult(
                 "Source and target languages must be differnt.",
-                [nameof(TargetLanguage)]
+                ["TargetLanguage"]
             );
         }
     }
