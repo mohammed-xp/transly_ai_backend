@@ -3,7 +3,7 @@
 > ملف الحالة بتاع الـ mentor. بيتقرا في أول كل جلسة وبيتحدث في آخرها.
 > مكانه: `mentor/progress.md` في الريبو بتاع الباك اند.
 
-**آخر تحديث:** 2026-08-24
+**آخر تحديث:** 2026-08-26
 
 ---
 
@@ -55,9 +55,25 @@ enum TranslationEngine { mlKit, ai }
 
 ## الوضع الحالي
 
-- **Milestone:** M2 — أول endpoints
-- **التاسك المفتوحة:** ✅ **TASK-007 اتقفلت — Approved في r2 (2026-08-25).** الهجرة شغالة end-to-end (ترجمة حقيقية رجعت من الـ Interactions API)، 0 warnings، format نضيف، ومفيش `Unkown` في أي ملف.
-- **⏸️ وقوف:** مفيش TASK-008 لحد ما هو يطلب.
+- **Milestone:** M7 — Testing (**اتقدّمت** من مكانها في الـ curriculum — السبب في ملف TASK-008). M2 لسه مفتوحة وهيترجعلها بعدين.
+- **التاسك المفتوحة:** 🚧 **TASK-008 — أول tests** (اتكتبت 2026-08-26 بناءً على طلبه). الملف: `mentor/tasks/TASK-008.md`.
+- **اللي قبلها:** ✅ TASK-007 اتقفلت — Approved في r2 (2026-08-25). الهجرة شغالة end-to-end (ترجمة حقيقية رجعت من الـ Interactions API)، 0 warnings، format نضيف، ومفيش `Unkown` في أي ملف. الكوميت `fa6c556`.
+
+### 🎫 TASK-008 — الملخص
+
+**الشكل:** مشروع xUnit جديد + stub لـ `HttpMessageHandler` + **5 تيستات على `GeminiApiService`** (نجاح · `model_output` مش أول step · 429 + `RetryAfter` · JSON بايظ · status مجهول) + **بند إجباري: يكسر سطرين ويلصق الـ output الأحمر**.
+
+**الدافع (مسجّل بالتفصيل في الـ ticket):**
+1. **نمط "بيكتب دفاع مش قادر يشتغل" اتأكد 3 مرات** (TASK-005 guard في المكان الغلط · TASK-006 `Validation` من غير `: IValidatableObject` · TASK-007 `Unkown`/`Unknown`). التلاتة عدّوا بصفر warnings. ده التدخّل المقترح في المفكرة، مطبّق.
+2. **الـ quota عايق فعلي** — 20/يوم، وخلصت مرتين في review واحد. التاسك دي **بتاكل صفر requests** وبتديله القدرة يخلّي Gemini "يرجّع" أي حاجة عايزها.
+
+**الفخاخ المزروعة (تتراجع في الـ review):**
+- 🪤 **تعديل production code عشان التيست يعدّي** — الـ ticket بيقول صراحة "قف واسأل"، والإجابة معروفة: مش محتاج (اتأكدت — كل الـ types المطلوبة `public`).
+- 🪤 **تيست #5 يـ assert على القيمة الراجعة بدل اللوج.** بج TASK-007 كان `NotCompleted(Unknown)` **راجع صح تماماً** — البايظ كان التحذير بس. أي assert على الـ outcome هيعدّي أخضر مع نفس البج. لو وقع فيها، التاسك اتحوّلت لطقوس.
+- 🪤 **الـ interface.** الـ decision block بيربط بقرار #15: الـ seam هنا طلع `HttpMessageHandler` مش interface → **قرار #15 يفضل قايم**.
+- 🪤 **بند (د) اتخطى** — الـ review بيقف من غير قراية الباقي. تيست عمره ما اتشاف أحمر = نفس بج الـ guard اللي المسار مبيعدّيش عليه.
+
+**السؤال بالتجربة:** الفرق بين body = نص عادي و body = JSON مقصوص — هل الاتنين بيوصلوا لنفس الـ `catch (JsonException)`؟ (التلميح: بصّ على الـ `Content-Type` اللي هو نفسه بيبنيه في الـ stub).
 
 ### ⬜ مفتوح بعد TASK-007
 
@@ -71,7 +87,7 @@ enum TranslationEngine { mlKit, ai }
 - **اللي قبلها:** ✅ TASK-006 اتقفلت — Approved في r2 (2026-08-25) مع دين مؤجل بقراره (تحت)
 - **الكوميت:** `0224a54` (الجسم الأساسي) + تعديلات r2 (`using (httpResponse)` + `SystemTextJsonValidationMetadataProvider`)
 - **✅ متحقق عملياً (2026-08-25):** `GET /v1/languages` → 200 + `Cache-Control: public,max-age=3600` · `banana` → 400 بمفتاح `sourceLanguage` · `""` → 400 · `en → en` → **400** · **صفر** استدعاءات Gemini في كل الحالات · build 0 warnings · `dotnet format` نضيف.
-- **⏸️ وقوف:** مفيش TASK-007 لحد ما هو يطلب.
+- ~~**⏸️ وقوف:** مفيش TASK-007 لحد ما هو يطلب.~~ — اتقفل، TASK-007 اتعملت واتقفلت.
 
 ### 💳 دين معلوم — مؤجل بقرار صريح منه (2026-08-25)
 
@@ -128,6 +144,7 @@ enum TranslationEngine { mlKit, ai }
 | TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | ✅ Done | Approved في r3. الـ contract مطابق حرف بحرف، `required`+`init` على الكل، 400 ProblemDetails مجاناً. الـ rounds الزيادة كانت ملاحظات متطبقتش مش أخطاء كود |
 | TASK-003 | الـ AI proxy الحقيقي — Gemini + typed HttpClient + user secrets | AI proxy | ✅ Done | Approved في r4. الـ boundary اتقفل صح في الآخر، والـ error handling اتاختبر على الحقيقي (503 + 429 من Gemini) وعدّى. الـ rounds التلاتة الأولى كلها كانت **نفس الدرس** بتلات أشكال — مين المسؤول عن معرفة ايه |
 | TASK-004 | `TranslationTone` enum + switch expression + توحيد شكل الخطأ | M2 | ✅ Done | Approved في r2. الشكل العام صح من أول مرة (`_ => throw` مش `_ => ""`، 0 warnings، global converter بـ CamelCase). الـ r1 كانت ثغرة واحدة: `allowIntegerValues` فضل `true` → `"tone": 99` كان بيرجّع 500 + stack trace. اتصلحت واتحققت (99 → 400 ✅، 1 → 400 ✅) |
+| TASK-008 | أول tests — xUnit + stub لـ `HttpMessageHandler` + 5 تيستات على `GeminiApiService` + إثبات إنها بتفشل | M7 | 🚧 مفتوحة (2026-08-26) | — |
 | TASK-007 | هجرة الـ AI proxy لـ Gemini Interactions API + إعادة اشتقاق تصنيف الفشل | AI proxy | ✅ Done (Approved r2) | **التاسك اللي هو جابها.** الهيكل كان صح من r1 كله — DTOs، status enum، `ExtractText` بالنوع مش بالموضع، جدول الـ outcome. الـ blockers التلاتة في r1: (1) `Unkown` **و** `Unknown` في نفس الـ enum → التحذير كود ميت بـ 0 warnings، (2) الـ RAW dump اتساب فبيسجّل نص المستخدم كامل وبيلغي قرار `store: false` اللي هو نفسه أخده، (3) الـ 422 معلّق عليها — **دي طلعت مقصودة منه واتسحبت من التصنيف**. اتصلحوا في r2 وترجمة حقيقية عدّت |
 | TASK-006 | `GET /v1/languages` + الكتالوج مصدر وحيد + رفض اللغات غير المدعومة بـ 400 | M2 | ✅ Done (Approved r2) | r1 كان فيها blocker حقيقي: `IValidatableObject` مش معلنة والميثود اسمها `Validation` → الـ `en → en` check **كود ميت** بـ 0 warnings، واتثبت بطلب حقيقي راح لـ Gemini. والـ `Dispose` اتعمل على `_httpClient` (مستعار) بدل `HttpResponseMessage` (مملوك). الاتنين اتصلحوا في r2 واتحققوا عملياً. الجسم الأساسي كان صح من أول مرة — الكتالوج والـ endpoint والـ attribute والـ caching headers كلهم اشتغلوا |
 | TASK-005 | الـ AI proxy يفشل بصدق — finishReason + تفرقة أنواع الفشل + ValidateOnStart + Timeout | AI proxy | ✅ Done (Approved r2) | الشكل المعماري صح: الـ hierarchy مظبوطة، **وعدّى الفخ الأساسي** (503 مش 429) + مرّر `Retry-After` + فرّق timeout عن client-cancel بـ exception filters. الـ blockers: (1) `catch (Exception)` بيرجّع `ex.Message` للعميل وبيعمل mapping موازي للـ hierarchy، (2) الفخ المزروع اتغطى غلط — الـ guard بتاع `candidates` بيمسك `[]` مش الحقل الناقص، (3) الـ acceptance criterion بتاع تعليق "ليه الـ status ده" اتخطى بالكامل + `dotnet format` متشغلش |
@@ -189,7 +206,8 @@ enum TranslationEngine { mlKit, ai }
   3. **TASK-007:** الـ enum فيه `Unkown` **و** `Unknown` مع بعض. `MapStatus` بترجّع `Unknown`، والفحص بيقارن بـ `Unkown` → **التحذير عمره ما هيطلع**.
   - **القاسم المشترك:** الكود **بيـ compile بصفر warnings** في التلات حالات، لأن كل حالة منهم "صحيحة" نحوياً. الـ compiler مش بيسأل "هل ده هيتنفذ؟".
   - **دي مش غفلة — دي منهج:** بيكتب الدفاع وبيعتبر الكتابة هي التنفيذ. الناقص خطوة واحدة: **اجعل الحالة تحصل، وشوف الكود اشتغل**.
-  - **التدخّل المقترح (TASK-008 مرشحة):** M7 — أول تاسك tests. مش عشان "coverage"، عشان الـ test هو **الآلة اللي بتجبرك تشغّل المسار**. الحالات التلاتة دي كان اختبار واحد هيمسك كل واحدة فيهم.
+  - **✅ التدخّل اتطبّق (2026-08-26) — TASK-008.** M7 اتقدّمت من مكانها. مش عشان "coverage"، عشان الـ test هو **الآلة اللي بتجبرك تشغّل المسار**. الحالات التلاتة دي كان اختبار واحد هيمسك كل واحدة فيهم.
+  - **البند الحاسم في التاسك = (د): يكسر سطر ويشوف التيست أحمر.** تيست عمره ما اتشاف أحمر هو **نفس** الـ bug: كود بيدّعي إنه بيحرس من غير ما حد يثبت إنه بيشتغل. لو عدّى البند ده صح، النمط اتعالج. لو تخطّاه، النمط اتنسخ في مكان جديد.
 - 🟡 **بيحط guard في المكان الغلط ويفتكر إنه غطى الحالة — جديدة في TASK-005.** كتب `if (response is null || candidate is null)` وهو فاكر إنها بتغطي "Gemini رجّع 200 من غير candidates". اتحقق عملياً: الحالة دي بترمي `JsonException` جوه `ReadFromJsonAsync` **قبل** ما الـ guard يشتغل أصلاً. الـ guard بيمسك `"candidates": []` بس — حالة تانية خالص.
   - **مرتبط بنمط قديم:** "بيعتمد على الـ default من غير ما يفتح الـ signature". هنا الشكل الجديد: **بيكتب دفاع من غير ما يتأكد إن المسار بيعدّي عليه**. الـ ticket كان طالب صراحة "مش هقولك الإجابة، جرّبها" — والتجربة مأتمّتش.
 - 🔴 **بيخلط بين "أملك" و"مستعير" في الـ `IDisposable` — جديدة في TASK-006 r1.** الملاحظة كانت: `HttpResponseMessage` جوه `TranslateAsync` مش بيتعمله dispose. اللي عمله: `GeminiApiService : IDisposable` + `_httpClient.Dispose()`. يعني **عمل dispose لحاجة الـ DI أداهاله، وساب الحاجة اللي هو عملها.**
@@ -260,10 +278,27 @@ enum TranslationEngine { mlKit, ai }
 | — | **العدّاد والاشتراكات** | ⬜ | **السبب اللي اتبنى عشانه الباك اند.** عدّ الاستهلاك (حروف ولا requests؟ — راجع درس `char`/`Rune`)، خطط، quota في `X-RateLimit-*` headers، رفض 429 |
 | — | **Streaming (SSE)** | ⬜ | الترجمة تظهر تدريجياً بدل انتظار الرد كامل — مكسب حقيقي في UX لتطبيق ترجمة |
 | M6 | Production concerns | ⬜ | caching للترجمات المتكررة (نفس النص + نفس الزوج = نفس الناتج — توفير مباشر في فاتورة الـ AI) |
-| M7 | Testing | ⬜ | — |
+| M7 | Testing | 🚧 **اتقدّمت — هنا** | TASK-008: الـ seam هو `HttpMessageHandler` مش interface (قرار #15 قايم). البداية من `GeminiApiService` لأن التلات bugs المتكررة كلها عاشت جوّاه. `WebApplicationFactory` (outcome → status code) تاسك جاية |
 | M8 | Docker + CI + نشر | ⬜ | الدومين، HTTPS عند الـ edge، توجيه `ApiEndpoints.baseUrl` على المنشور، و**تثبيت اسم الموديل** بدل `gemini-flash-latest` (اتنقلت من TASK-005 — قرار #18) |
 
 ## الجلسة الجاية
+
+> **الحالة بتاريخ 2026-08-26:** TASK-008 اتسلّمت ليه. الجلسة الجاية = **Review**.
+>
+> **اقرا الأول:** ملف `mentor/tasks/TASK-008.md` كامل + ملخص الفخاخ فوق. الترتيب في الـ review:
+> 1. **بند (د) الأول** — لو مفيش output أحمر ملصوق مرتين، الـ review بيقف هنا. ده مش بند شكلي، ده الغرض من التاسك.
+> 2. `git diff --stat` على `TranslyAI.Api/` — لازم يكون **فاضي**. أي تعديل في الـ production code = فخ #1 وقع فيه.
+> 3. تيست #5 — الـ assert على اللوج ولا على الـ outcome؟ ده الفخ الأساسي.
+> 4. شغّل `dotnet test` بنفسك قبل ما تكتب حرف.
+>
+> **أسئلة معلّقة من قبل TASK-008 لسه محتاجة إجابة منه:**
+> - 🔴 **قرار #18** — قيمة حقل `model` من رد ناجح: `gemini-flash-latest` (alias) ولا الاسم المحلول؟ سؤال واحد بيقفلها. لو alias → تثبيت اسم الموديل بينتقل من M8 لدلوقتي.
+> - 🔴 **الـ billing** — الترقية لـ Tier 1 عملها ولا لأ؟ عايق على أي تاسك بتلمس Gemini.
+> - ⬜ الوقت المتاح أسبوعياً (سؤال intake رقم 4، لسه مجاوبش).
+
+---
+
+### أرشيف — TASK-005
 
 **✅ TASK-005 اتقفلت — Approved في r2 (2026-08-24).** التلات blockers اتصلحوا كلهم، والفخ المزروع اتحقق منه بتجربة فعلية (5 حالات JSON، صفر exceptions).
 
