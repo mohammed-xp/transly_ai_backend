@@ -8,7 +8,8 @@ public abstract record TranslationOutcome
 
     public sealed record Success(
         string Text,
-        string Model
+        string Model,
+        DateTimeOffset CreatedAt
     ) : TranslationOutcome;
 
     public sealed record RateLimited(

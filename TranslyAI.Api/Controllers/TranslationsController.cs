@@ -7,7 +7,7 @@ namespace TranslyAI.Api.Controllers;
 
 [ApiController]
 [Route("v1/[controller]")]
-public class TranslationsController(GeminiApiService geminiApiService) : ControllerBase
+public class TranslationsController(TranslationService translationService) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<TranslationResponse>> Translate(TranslationRequest translation, CancellationToken cancellationToken)
@@ -17,7 +17,7 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
             SourceLanguage = LanguageCatalog.Get(translation.SourceLanguage).Code,
             TargetLanguage = LanguageCatalog.Get(translation.TargetLanguage).Code,
         };
-        var outcome = await geminiApiService.TranslateAsync(request, cancellationToken);
+        var outcome = await translationService.TranslateAsync(request, cancellationToken);
 
         switch (outcome)
         {
@@ -30,7 +30,7 @@ public class TranslationsController(GeminiApiService geminiApiService) : Control
                     TargetLanguage = request.TargetLanguage,
                     Model = success.Model,
                     Tone = request.Tone,
-                    CreatedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = success.CreatedAt,
                 });
 
             // 503: الـ quota بتاعتنا خلصت.

@@ -145,7 +145,7 @@ public class GeminiApiService
                 return new TranslationOutcome.UpstreamError();
             }
 
-            return new TranslationOutcome.Success(translatedText, response.Model);
+            return new TranslationOutcome.Success(translatedText, response.Model, DateTimeOffset.UtcNow);
         }
     }
 
