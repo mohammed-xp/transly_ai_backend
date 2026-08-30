@@ -12,7 +12,7 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
     {
         modelBuilder.Entity<CachedTranslation>(entity =>
         {
-            entity.HasIndex(t => t.CacheKey).IsUnique();
+            entity.HasIndex(t => new { t.CacheKey, t.Model }).IsUnique();
 
             entity.Property(t => t.Tone).HasConversion<string>().HasMaxLength(16);
 

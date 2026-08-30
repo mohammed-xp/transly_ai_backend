@@ -24,6 +24,8 @@ public class GeminiApiService
         _httpClient.DefaultRequestHeaders.Add("x-goog-api-key", _options.ApiKey);
     }
 
+    public string ModelName => _options.Model;
+
     public async Task<TranslationOutcome> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
     {
         string toneInstruction = translationRequest.Tone switch

@@ -18,9 +18,11 @@ public class TranslationService(
     {
         var cacheKey = BuildCacheKey(request);
 
+        var model = geminiApiService.ModelName;
+
         var cached = await dbContext.CachedTranslations
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.CacheKey == cacheKey, cancellationToken);
+            .FirstOrDefaultAsync(t => t.CacheKey == cacheKey && t.Model == model, cancellationToken);
 
         if (cached is not null)
         {
