@@ -1,9 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
+using TranslyAI.Api.Entities;
 using TranslyAI.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +45,9 @@ builder.Services.AddHttpClient<GeminiApiService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<AuthService>();
 
 
 builder.Services.AddScoped<TranslationService>();

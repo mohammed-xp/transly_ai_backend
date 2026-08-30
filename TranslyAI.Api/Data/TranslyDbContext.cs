@@ -8,6 +8,8 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
     public DbSet<CachedTranslation> CachedTranslations =>
         Set<CachedTranslation>();
 
+    public DbSet<User> Users => Set<User>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CachedTranslation>(entity =>
@@ -17,6 +19,13 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
             entity.Property(t => t.Tone).HasConversion<string>().HasMaxLength(16);
 
             entity.Property(t => t.CreatedAtUtc).HasColumnType("datetime(6)");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => u.Email).IsUnique();
+
+            entity.Property(u => u.CreatedAtUtc).HasColumnType("datetime(6)");
         });
     }
 }
