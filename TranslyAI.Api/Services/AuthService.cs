@@ -1,4 +1,3 @@
-using System.Data.Common;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
@@ -45,17 +44,54 @@ public class AuthService(
         }
         catch (DbUpdateException ex) when (IsUniqueConstrainViolation(ex))
         {
-            logger.LogInformation("Gegister race lost for an already-registered email.");
+            logger.LogInformation("Register race lost for an already-registered email.");
             return null;
         }
 
         return user;
     }
 
+    public async Task<User?> LoginAsync(
+        string email,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+
+        var user = await dbContext.Users
+            .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
+
+        switch (result)
+        {
+            case PasswordVerificationResult.Success:
+                return user;
+
+            case PasswordVerificationResult.SuccessRehashNeeded:
+                user.PasswordHash = passwordHasher.HashPassword(user, password);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Password hash upgraded for user {UserId}.", user.Id);
+                return user;
+
+            case PasswordVerificationResult.Failed:
+                return null;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unhandled {nameof(PasswordVerificationResult)} value: {result}."
+                );
+        }
+    }
+
     private static string NormalizeEmail(string email)
-    => email.Trim().ToLowerInvariant();
+        => email.Trim().ToLowerInvariant();
 
     private static bool IsUniqueConstrainViolation(DbUpdateException exception)
-        => exception.InnerException is DbException { SqlState: "23000" or "23505" }
-        || exception.InnerException is MySqlException {Number: 1062};
+        => exception.InnerException is MySqlException { Number: 1062 };
 }

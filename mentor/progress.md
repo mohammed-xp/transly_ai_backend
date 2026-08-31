@@ -3,7 +3,7 @@
 > ملف الحالة بتاع الـ mentor. بيتقرا في أول كل جلسة وبيتحدث في آخرها.
 > مكانه: `mentor/progress.md` في الريبو بتاع الباك اند.
 
-**آخر تحديث:** 2026-08-30
+**آخر تحديث:** 2026-08-30 (جلسة تالتة في نفس اليوم — assign TASK-013)
 
 ---
 
@@ -58,7 +58,51 @@ enum TranslationEngine { mlKit, ai }
 ## الوضع الحالي
 
 - **Milestone:** **M5 — Auth** (بدأت 2026-08-30 **بطلب صريح منه**: "عايز ابدأ شغل، رأيك أبدأ بالـ auth والـ users؟"). M3 اتقفلت بـ TASK-010/011. **M4 اتخطّت بوعي** — الدين المسجّل عليها كله في مسار الترجمة (`GeminiApiService` + `TranslationRequest`) ومش واقف في طريق الـ auth، والـ `[ApiController]` + DataAnnotations بيدوا `ProblemDetails` مقبولة على endpoints الـ auth. M4 بتترجعلها بعد ما الـ auth تقف على رجليها.
-- **التاسك المفتوحة:** ✅ **TASK-012 — Approved في r2 (2026-08-30)** بشرط تنضيفة واحدة قبل الكوميت (شيل الـ clause الميت). الملف: `mentor/tasks/TASK-012.md`.
+- **التاسك المفتوحة:** 🚧 **TASK-013 — الـ login وإصدار JWT + أول endpoint محمي** (اتكتبت 2026-08-30 **بطلب صريح منه**: "عايز ابدا شغل — عايز أعرف الخطوة الجاية"). الملف: `mentor/tasks/TASK-013.md`.
+- **اللي قبلها:** ✅ **TASK-012 اتقفلت واتكوميتت** — `e22da7e feat: add user registration with password hashing (TASK-012)`. الـ working tree نضيف.
+
+### ⚠️ شرط الـ Approval بتاع TASK-012 اتكوميت من غير ما يتنفّذ (2026-08-30)
+
+الـ review في r2 كانت **Approved بشرط** يشيل الـ clause الميت من [AuthService.cs:59](../TranslyAI.Api/Services/AuthService.cs#L59) (`DbException { SqlState: "23000" or "23505" }` — اللي **هو نفسه** أثبت إنه عمره ما بيتحقق مع `MySql.Data`). اتكوميت زي ما هو، ومعاه الـ nits (`IsUniqueConstrainViolation` ناقصة `t` · `"Gegister race lost"`).
+
+**التصنيف:** مش نمط جديد ومش بلوكر — بس ده **بالظبط** بند 1 في "Definition of Submitted" (كل ملاحظة يا اتصلحت يا ليها سبب معلن). فيه حجة مقبولة محتملة (portability لـ PostgreSQL — Npgsql بيملا `SqlState` فعلاً)، بس الحجة دي **اتقالتش**. اتحطت كبند (د) في TASK-013: يتشال أو يتكتب سببه في تعليق.
+
+**ماتتحسبش تكرار في المفكرة لحد ما يترد عليها** — الفرق بين "نسي" و"قرر وسكت" لسه مش معروف.
+
+### 🔬 جلسة 2026-08-31 — تشخيص وسط التاسك (مش review نهائي)
+
+**قال "حاسس إن في مشكلة ومش قادر أحلها" وطلب مراجعة.** الشغل كان مكتوب (الكود اتسلّم له في رسالة "ساعدني" في نفس التاسك — نفس ملاحظة التقييم بتاعة TASK-010/012).
+
+**العرض:** `register` 201 ✅ · `login` 200 بتوكن سليم ✅ · **`GET /v1/auth/me` → 401 بتوكن صحيح**.
+
+**الدليل اللي حسم التشخيص (اتشغّل، مش اتقرا):**
+| | |
+|---|---|
+| `WWW-Authenticate` في الـ 401 | **فاضي** `''` |
+| الـ `OnAuthenticationFailed` بتاعته | **عمره ما اتنادى** |
+
+→ يعني الـ middleware قبلت التوكن، والـ 401 طالعة من `return Unauthorized();` بتاعه هو. **سببين مركبين:**
+1. **`options.MapInboundClaims = false` مكانتش موجودة** → `sub` اتحوّلت لـ `ClaimTypes.NameIdentifier` URI → `FindFirstValue("sub")` = `null`.
+2. **شال الـ `email` claim من التوكن** (بتعليق فيه سبب) **وساب `Me()` بتطلبها** → `null` تانية. أي واحدة منهم لوحدها كفاية تكسرها.
+
+**🔴 وbug تالت مكانش شايفه أصلاً — `SuccessRehashNeeded` من غير سطر الـ rehash:** `SaveChangesAsync` على change tracker فاضي + لوج بيقول `"Password hash upgraded"`. **دفاع مش قادر يشتغل + لوج بيكدب**، 0 warnings. نفس النمط المسجّل 3 مرات، بس المرة دي **مبتعلنش عن نفسها** — الـ 401 بتقول "أنا بايظة"، دي بتقول "أنا نجحت".
+
+**النتيجة بعد تصليحه (اتشغّلت بنفسي 2026-08-31):** الحالات السبعة كلها عدّت — `build` 0 warnings · `format` نضيف · `test` 6/6 · حالة 5 بقت 200 بالـ id والإيميل · **حالة 3 و2 ردهم متطابق حرفياً** (دفاع الـ enumeration اتحقق منه) · **حالة 7: توكن منتهي من 15 ثانية اترفض** (`ClockSkew = TimeSpan.Zero` شغالة). اختار **الحل (أ)** للإيميل (رجّعه للـ claims) — **من غير السبب المكتوب، والتعليق القديم اللي بيقول "شلته" لسه مكانه**.
+
+**🟢 نقطة قوة جديدة تتسجّل:** **ضاف `JwtBearerEvents.OnAuthenticationFailed` من نفسه** — مكانش في الكود المسلّم له. الغريزة صح تماماً (خلّي السيرفر يتكلم بدل ما تستنى الوصف). **اللي كان ناقص هو قراية سكوت الـ diagnostic** — فسّر "مفيش output" على إن الـ logging مش شغال، بدل "الـ authentication نجحت". **الأداة كانت صح، الاستنتاج منها هو اللي كان ناقص** — ودي مهارة تتبني، مش نمط يتسجّل ضده.
+
+**⬜ لسه مفتوح على التاسك:** التايبوهات (`IsUniqueConstrainViolation` · `"Gegister"` · `"Email Already registered."` — الـ 3 عدّوا كوميت TASK-012 ولسه مكانهم) · سبب اختيار (أ) للإيميل · نسخة الـ package 10.0.9 مقابل OpenApi 10.0.11 · أسئلة (هـ) و(و) والسؤالين الإضافيين.
+
+### 🎫 TASK-013 — الملخص (الفخاخ المزروعة، تتراجع في الـ review)
+
+- 🪤 **`PasswordVerificationResult` ليها تلات قيم مش اتنين.** `SuccessRehashNeeded` هي القيمة التالتة، والتعامل مع النوع كأنه `bool` (`if (result != Success) return null;`) **بيرفض مستخدم بباسورد صح** لما نرقّي الخوارزمية. ده **نفس نمطه المسجّل**: "بيعتمد على الـ default بتاع API من غير ما يفتح الـ signature" (TASK-004، `allowIntegerValues`). اتزرع كسؤال إجباري (بند هـ) بـ 4 أسئلة، والسؤال 3 بيربطها بـ decision block بتاع TASK-012 (رقم النسخة جوه الـ hash string) — يعني الإجابة **موجودة عنده** لو ربط.
+- 🪤 **الحالة السابعة — انتهاء التوكن.** الـ ticket بيطلب expiry دقيقة + انتظار 70 ثانية + النتيجة **زي ما هي حتى لو مش المتوقعة**. `TokenValidationParameters.ClockSkew` الافتراضي **5 دقايق**، يعني التوكن هيفضل شغّال. **مش هقوله الإجابة** — الفخ هو إنه يبلّغ النتيجة الحقيقية بدل ما يفترض إنه اشتغل أو يصلّحها في صمت. ده تطبيق مباشر لدرس TASK-012 r2 (**"الشغل ممتاز، التقرير صفر"**).
+- 🪤 **user enumeration في الـ login.** الـ ticket بيسأل عن الرد على "إيميل مش موجود" وعلى "باسورد غلط" **من غير ما يقول إنهم لازم يبقوا واحد**، وبيطلب في الـ checklist الـ body بتاع الاتنين ملصوق. لو الردين مختلفين، الفرق هيبان في التسليم نفسه من غير ما أسأل.
+- 🪤 **ترتيب `UseAuthentication`/`UseAuthorization` في الـ pipeline.** ترتيب غلط = `[Authorize]` بتعدّي صامتة بـ 0 warnings. **نفس بنية النمط المسجّل 3 مرات** ("دفاع مش قادر يشتغل") في مكان جديد — والحالتين 4 و6 في جدول الإثبات هما اللي بيكشفوه.
+- 🪤 **`JwtSecurityTokenHandler` (legacy) vs `JsonWebTokenHandler`.** **اتأكدت عملياً بـ probe** (`dotnet list package --include-transitive` على مشروع نضيف): الـ JwtBearer 10.0.11 بيجيب **الاتنين** transitively (`System.IdentityModel.Tokens.Jwt` 8.19.2 و`Microsoft.IdentityModel.JsonWebTokens` 8.19.2). يعني الـ IntelliSense هيعرض الاتنين ومفيش حاجة هتحذّره. نفس بنية فخ Pomelo (قرار #23).
+- ⬜ **سؤال (و) — `"sub"` vs `ClaimTypes.NameIdentifier`:** **الإجابة مش معروفة لي بيقين** (سلوك `MapInboundClaims` في .NET 10). اتكتب في الـ ticket صراحة إني مش هجاوب من الذاكرة وإن النتيجة تتسجّل. **ده مقصود** بعد حادثة `SqlState` — أحسن من ادعاء أراجعه بعدين.
+
+**اللي فضل صريح في الـ ticket بقصد:** الـ package والنسخة (10.0.11 — متحقق منها على nuget، مفيش معركة نسخ زي Pomelo)، وإن الـ signing key في user secrets، وإن refresh tokens **بره الـ scope** بتحذير صريح (لأن كل tutorial بيعملهم في نفس النفس).
 
 ### 🔴🔴 تصحيح — الكود بتاعي كان غلط، وهو مسكه بالتشغيل (r2، 2026-08-30)
 
@@ -266,7 +310,8 @@ exception.InnerException is DbException { SqlState: "23000" or "23505" }
 
 | ID | العنوان | Milestone | الحالة | نتيجة الـ review |
 |---|---|---|---|---|
-| TASK-012 | `User` entity + `POST /v1/auth/register` + password hashing بـ `IPasswordHasher<User>` | M5 | 🚧 مفتوحة (اتكتبت 2026-08-30) | — |
+| TASK-013 | `POST /v1/auth/login` + إصدار JWT + `GET /v1/auth/me` بـ `[Authorize]` | M5 | 🚧 مفتوحة (اتكتبت 2026-08-30) | — |
+| TASK-012 | `User` entity + `POST /v1/auth/register` + password hashing بـ `IPasswordHasher<User>` | M5 | ✅ Done (Approved r2) — `e22da7e` | **أهم حدث فيها مجاش من الكود:** صحّح كود الـ mentor **بالتشغيل** — الشرط `DbException { SqlState: "23000" }` عمره ما بيتحقق مع `MySql.Data` (`SqlState` = `null`)، وضاف `MySqlException { Number: 1062 }` من نفسه. اتأكدت بـ probe مستقل — هو صح. **الناقص كان التبليغ:** قال "تم" وبس. وقف كمان وسأل على `[EmailAddress]` على الـ entity **قبل** ما يشحنها — اعتراض استباقي، أول مرة. **⚠️ كل الكود اتسلّم له في رسالة "ساعدني"** — ماتتحسبش دليل على قدرته يكتب auth من الصفر. **شرط الـ approval (شيل الـ clause الميت) اتكوميت من غير ما يتنفّذ** → اتحوّل لبند (د) في TASK-013 |
 | TASK-011 | الكاش ميقدّمش ترجمة من موديل تاني — تثبيت الموديل + مصدر واحد لحقل `Model` + إبطال الكاش | M3 | ✅ Done (Approved) | **الكود اتقفل نضيف من أول تسليم بعد المراجعة الأولى** — تثبيت الموديل، `ModelName` على `GeminiApiService`، index مركّب `(CacheKey, Model)`، migration مطابقة للمتوقع (`DropIndex`+`CreateIndex` بس، مفيش تعديل عمود). build 0 warnings، format نضيف، test 6/6. **الإثبات العملي جه صح من أول مرة:** 3 صفوف، 2 موديل مختلفين، MISS ثم HIT بعد تغيير الموديل — نفس نمط "بيتحقق بالتشغيل مش بالقراية" اللي اتسجّل في TASK-010. **سؤال الـ index order** جاوب "مش بيفرق" وده صح لمنع التكرار بس ناقص نص الصورة (leftmost prefix لاستعلام مستقبلي بـ `CacheKey` لوحده) — اتشرحله. **سؤال `cached.Model` vs `model`** "مش عارف" بصراحة — اتشرحله إنهم متطابقين مضمون من الـ `WHERE` والفرق تجميلي بس |
 | TASK-001 | تنضيف الـ template + `/health` + أول commit | M0 | ✅ Done | Approved في الـ round التالت — اتنين rounds اتضاعوا في acceptance criteria متقروش |
 | TASK-002 | `POST /v1/translations` بـ records و fake logic | M2 | ✅ Done | Approved في r3. الـ contract مطابق حرف بحرف، `required`+`init` على الكل، 400 ProblemDetails مجاناً. الـ rounds الزيادة كانت ملاحظات متطبقتش مش أخطاء كود |
@@ -435,7 +480,7 @@ exception.InnerException is DbException { SqlState: "23000" or "23505" }
 | — | **الـ AI proxy** | ✅ | اتعمل في TASK-003: `AddHttpClient<GeminiApiService>` + `GeminiOptions` من user secrets + prompt بالنبرات التلاتة + 502 على فشل المزوّد. **الباقي منه (= TASK-005):** `finishReason` + تفرقة أنواع الفشل، `ValidateOnStart` للـ key، Timeout. تثبيت اسم الموديل اتنقل لـ M8 |
 | M3 | EF Core | 🚧 **هنا** | TASK-010 ✅: **كاش الترجمات** — نفس النص+الزوج+النبرة مايتشتراش مرتين. **TASK-011 ✅:** الكاش يعرف بأي موديل اتولد كل صف + تثبيت اسم الموديل + حقل `Model` من مصدر واحد. الـ history مؤجّل لأنه محتاج identity (M5) |
 | M4 | Validation / errors / logging | ⏭️ **اتخطّت بوعي (2026-08-30)** | الدين عليها كله في مسار الترجمة (تسريب الـ `charset` في `GeminiApiService` + مفتاح `TargetLanguage` PascalCase) **ومش واقف في طريق الـ auth**. الـ `[ApiController]` بيدي `ProblemDetails` مقبولة على endpoints الـ auth مجاناً. تترجعلها بعد ما الـ auth تقف. شكل الخطأ يطابق `sealed class Failure` عند الـ client |
-| M5 | Auth (JWT) | 🚧 **هنا** | ✅ اتحسم: **email + password، مفيش auth في التطبيق حالياً** (قرار #26)، وجدول بإيدنا + `IPasswordHasher` مش Identity الكامل (قرار #25). **TASK-012 🚧:** `User` + register + hashing. الجاي بعدها (مش تاسكات — خريطة): login وإصدار JWT → التحقق و`[Authorize]` → refresh tokens → ربط الترجمات بالمستخدم → quota لكل حساب |
+| M5 | Auth (JWT) | 🚧 **هنا** | ✅ اتحسم: **email + password، مفيش auth في التطبيق حالياً** (قرار #26)، وجدول بإيدنا + `IPasswordHasher` مش Identity الكامل (قرار #25). **TASK-012 ✅:** `User` + register + hashing. **TASK-013 🚧:** login + إصدار JWT + `[Authorize]` + `/me` (اتحطوا مع بعض بقصد — توكن محدش بيتحقق منه = "دفاع مش قادر يشتغل" بالتصميم). الجاي بعدها (مش تاسكات — خريطة): refresh tokens → قفل `/v1/translations` بـ `[Authorize]` → ربط الترجمات بالمستخدم → quota لكل حساب |
 | — | **العدّاد والاشتراكات** | ⬜ | **السبب اللي اتبنى عشانه الباك اند.** عدّ الاستهلاك (حروف ولا requests؟ — راجع درس `char`/`Rune`)، خطط، quota في `X-RateLimit-*` headers، رفض 429 |
 | — | **Streaming (SSE)** | ⬜ | الترجمة تظهر تدريجياً بدل انتظار الرد كامل — مكسب حقيقي في UX لتطبيق ترجمة |
 | M6 | Production concerns | ⬜ | caching للترجمات المتكررة (نفس النص + نفس الزوج = نفس الناتج — توفير مباشر في فاتورة الـ AI) |
@@ -444,11 +489,19 @@ exception.InnerException is DbException { SqlState: "23000" or "23505" }
 
 ## الجلسة الجاية
 
-> **الحالة بتاريخ 2026-08-30 (جلسة تانية في نفس اليوم):** M3 اتقفلت · **M5 بدأت بطلب صريح منه** · **TASK-012 🚧 مفتوحة، مستنيين تسليم**.
+> **الحالة بتاريخ 2026-08-30 (جلسة تالتة في نفس اليوم):** M3 اتقفلت · M5 ماشية · TASK-012 ✅ اتكوميتت (`e22da7e`) · **TASK-013 🚧 مفتوحة، مستنيين تسليم**.
 >
-> **الجلسة الجاية غالباً = review لـ TASK-012.** اقرا `mentor/tasks/TASK-012.md` والفخاخ التلاتة المسجّلة في قسم "TASK-012 — الملخص" فوق **قبل** ما تبدأ المراجعة.
+> **الجلسة الجاية غالباً = review لـ TASK-013.** اقرا `mentor/tasks/TASK-013.md` والفخاخ الخمسة المسجّلة في قسم "TASK-013 — الملخص" فوق **قبل** ما تبدأ المراجعة.
 >
-> **اللي يتراجع بالذات:** (1) هل فيه `AnyAsync` + `SaveChanges` من غير معالجة الـ `DbUpdateException`؟ (2) هل الـ response body فيه `PasswordHash`؟ (3) بند (د) — هل جاوب على "مين المسؤول عن السلوك ده وهل هو مضمون على PostgreSQL" ولا وقف عند "اترفض"؟
+> **اللي يتراجع بالذات:**
+> 1. **`PasswordVerificationResult`** — عامله كـ enum بتلات قيم ولا كـ bool؟ لو كتب `!= Success` يبقى الفخ اشتغل.
+> 2. **الحالة السابعة (الانتهاء)** — بلّغ النتيجة الحقيقية (التوكن فضل شغّال بسبب `ClockSkew`) ولا افترض إنها اشتغلت؟ **ده مقياس درس التبليغ بتاع TASK-012 r2.**
+> 3. **الردين على "إيميل مش موجود" و"باسورد غلط"** — واحد ولا مختلفين؟ لو مختلفين، ده user enumeration.
+> 4. **ترتيب `UseAuthentication`/`UseAuthorization`** — والحالتين 4 و6 هما الإثبات إنه شغال فعلاً.
+> 5. **بند (د)** — الـ clause الميت اتشال ولا اتكتب سببه؟
+> 6. **أي handler استعمل** — `JsonWebTokenHandler` ولا الـ legacy؟
+>
+> **⬜ نتيجة سؤال (و) تتسجّل هنا لما تيجي:** `User.FindFirst("sub")` vs `ClaimTypes.NameIdentifier` مع `MapInboundClaims` الافتراضي في .NET 10 — **مش معروفة لي بيقين**، فمتقولش الإجابة في الـ review قبل ما تشوف نتيجته.
 >
 > **🛑 القاعدة الثابتة لسه سارية:** بعد الـ review، حدّث `progress.md` **وقف**. مفيش TASK-013 من غير ما يطلبها بالكلام.
 >
