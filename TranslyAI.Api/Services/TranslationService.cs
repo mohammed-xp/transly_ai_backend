@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Services;
 
@@ -14,6 +15,7 @@ public class TranslationService(
 {
     public async Task<TranslationOutcome> TranslateAsync(
         TranslationRequest request,
+        Guid userId,
         CancellationToken cancellationToken)
     {
         var cacheKey = BuildCacheKey(request);
@@ -27,6 +29,13 @@ public class TranslationService(
         if (cached is not null)
         {
             logger.LogInformation("Cache HIT {CacheKey} - Gemini was not called.", cacheKey);
+
+            await RecordUsageAsync(
+                request,
+                userId,
+                TranslationSource.Cache,
+                cancellationToken
+            );
 
             return new TranslationOutcome.Success(
                 cached.TranslatedText,
@@ -43,6 +52,13 @@ public class TranslationService(
         {
             return outcome;
         }
+
+        await RecordUsageAsync(
+            request,
+            userId,
+            TranslationSource.Gemini,
+            cancellationToken
+        );
 
         dbContext.CachedTranslations.Add(new CachedTranslation
         {
@@ -74,4 +90,27 @@ public class TranslationService(
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     }
+
+    private async Task RecordUsageAsync(
+        TranslationRequest request,
+        Guid userId,
+        TranslationSource source,
+        CancellationToken cancellationToken)
+    {
+        dbContext.TranslationUsages.Add(new TranslationUsage
+        {
+            UserId = userId,
+            SourceLanguage = request.SourceLanguage,
+            TargetLanguage = request.TargetLanguage,
+            Tone = request.Tone,
+            CharacterCount = CountCharacters(request.Text),
+            Source = source,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static int CountCharacters(string text) => text.EnumerateRunes().Count();
+
 }

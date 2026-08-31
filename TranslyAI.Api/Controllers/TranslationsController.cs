@@ -1,23 +1,37 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Enums;
+using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services;
 
 namespace TranslyAI.Api.Controllers;
 
 [ApiController]
 [Route("v1/[controller]")]
+[Authorize]
 public class TranslationsController(TranslationService translationService) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<TranslationResponse>> Translate(TranslationRequest translation, CancellationToken cancellationToken)
+    [ProducesResponseType<TranslationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<TranslationResponse>> Translate(
+        TranslationRequest translation,
+        CancellationToken cancellationToken)
     {
+        var userId = User.GetUserId();
+
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
         var request = translation with
         {
             SourceLanguage = LanguageCatalog.Get(translation.SourceLanguage).Code,
             TargetLanguage = LanguageCatalog.Get(translation.TargetLanguage).Code,
         };
-        var outcome = await translationService.TranslateAsync(request, cancellationToken);
+        var outcome = await translationService.TranslateAsync(request, userId.Value, cancellationToken);
 
         switch (outcome)
         {

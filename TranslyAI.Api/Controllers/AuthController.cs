@@ -1,8 +1,7 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.JsonWebTokens;
 using TranslyAI.Api.Dtos;
+using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services;
 
 namespace TranslyAI.Api.Controllers;
@@ -84,14 +83,13 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public ActionResult<MeResponse> Me()
     {
-        var subject = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var userId = User.GetUserId();
 
-        if (subject is null
-            || !Guid.TryParse(subject, out var userId))
+        if (userId is null)
         {
             return Unauthorized();
         }
 
-        return Ok(new MeResponse { Id = userId });
+        return Ok(new MeResponse { Id = userId.Value });
     }
 }

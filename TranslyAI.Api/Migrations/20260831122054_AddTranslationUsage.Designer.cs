@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TranslyAI.Api.Data;
 
@@ -10,9 +11,11 @@ using TranslyAI.Api.Data;
 namespace TranslyAI.Api.Migrations
 {
     [DbContext(typeof(TranslyDbContext))]
-    partial class TranslyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831122054_AddTranslationUsage")]
+    partial class AddTranslationUsage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,11 +148,13 @@ namespace TranslyAI.Api.Migrations
 
             modelBuilder.Entity("TranslyAI.Api.Entities.TranslationUsage", b =>
                 {
-                    b.HasOne("TranslyAI.Api.Entities.User", null)
+                    b.HasOne("TranslyAI.Api.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }
