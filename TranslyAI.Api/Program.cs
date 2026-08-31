@@ -88,8 +88,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnAuthenticationFailed = context =>
             {
-                Console.WriteLine("Jwt Authintcation Failed");
-                Console.WriteLine(context.Exception.Message);
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Jwt Authentication Failed: {Respon}", context.Exception.Message);
 
                 return Task.CompletedTask;
             }

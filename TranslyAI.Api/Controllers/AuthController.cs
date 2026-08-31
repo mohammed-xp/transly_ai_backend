@@ -92,6 +92,6 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
             return Unauthorized();
         }
 
-        return Ok(new MeResponse { Id = userId, Email = "" });
+        return Ok(new MeResponse { Id = userId });
     }
 }

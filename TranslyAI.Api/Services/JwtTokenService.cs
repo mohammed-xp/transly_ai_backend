@@ -38,7 +38,6 @@ public class JwtTokenService
             Claims = new Dictionary<string, object>
             {
                 [JwtRegisteredClaimNames.Sub] = user.Id.ToString(),
-                // [JwtRegisteredClaimNames.Email] = user.Email, لا احتاج الايميل في كل ريكويست لذلك قمت بمسحه
                 [JwtRegisteredClaimNames.Jti] = Guid.CreateVersion7().ToString()
             }
         };

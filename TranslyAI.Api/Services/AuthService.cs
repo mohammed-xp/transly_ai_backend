@@ -42,7 +42,7 @@ public class AuthService(
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (IsUniqueConstrainViolation(ex))
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
             logger.LogInformation("Register race lost for an already-registered email.");
             return null;
@@ -92,6 +92,6 @@ public class AuthService(
     private static string NormalizeEmail(string email)
         => email.Trim().ToLowerInvariant();
 
-    private static bool IsUniqueConstrainViolation(DbUpdateException exception)
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
         => exception.InnerException is MySqlException { Number: 1062 };
 }
