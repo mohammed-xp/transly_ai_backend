@@ -124,3 +124,5 @@ app.MapGet("/health", () => new
 });
 
 app.Run();
+
+public partial class Program;
