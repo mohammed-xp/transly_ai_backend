@@ -48,6 +48,11 @@ builder.Services.AddOptions<JwtOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<QuotaOptions>()
+    .Bind(builder.Configuration.GetSection("Quota"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 
 builder.Services.AddHttpClient<GeminiApiService>(client =>
 {

@@ -22,6 +22,8 @@ public abstract record TranslationOutcome
 
     public sealed record UpstreamTimeout() : TranslationOutcome;
 
+    public sealed record QuotaExceeded() : TranslationOutcome;
+
     public sealed record NotCompleted(
         GeminiInteractionStatus Status
     ) : TranslationOutcome;

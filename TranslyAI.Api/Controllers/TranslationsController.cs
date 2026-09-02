@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TranslyAI.Api.Dtos;
@@ -15,6 +16,7 @@ public class TranslationsController(TranslationService translationService) : Con
     [HttpPost]
     [ProducesResponseType<TranslationResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<TranslationResponse>> Translate(
         TranslationRequest translation,
         CancellationToken cancellationToken)
@@ -31,9 +33,13 @@ public class TranslationsController(TranslationService translationService) : Con
             SourceLanguage = LanguageCatalog.Get(translation.SourceLanguage).Code,
             TargetLanguage = LanguageCatalog.Get(translation.TargetLanguage).Code,
         };
-        var outcome = await translationService.TranslateAsync(request, userId.Value, cancellationToken);
+        var result = await translationService.TranslateAsync(request, userId.Value, cancellationToken);
 
-        switch (outcome)
+        Response.Headers["X-RateLimit-Limit"] = result.Quota.Limit.ToString(CultureInfo.InvariantCulture);
+        Response.Headers["X-RateLimit-Remaining"] = result.Quota.Remaining.ToString(CultureInfo.InvariantCulture);
+        Response.Headers["X-RateLimit-Reset"] = result.Quota.ResetsAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+
+        switch (result.Outcome)
         {
             case TranslationOutcome.Success success:
                 return Ok(new TranslationResponse
@@ -46,6 +52,14 @@ public class TranslationsController(TranslationService translationService) : Con
                     Tone = request.Tone,
                     CreatedAt = success.CreatedAt,
                 });
+            // 429: الـ quota الخاصة بالمستخدم خلصت.
+            case TranslationOutcome.QuotaExceeded:
+                Response.Headers.RetryAfter = SecondsUntil(result.Quota.ResetsAt);
+                return Problem(
+                    detail: "Youhave used your daily translation quota.",
+                    statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Too Many Requests"
+                );
 
             // 503: الـ quota بتاعتنا خلصت.
             case TranslationOutcome.RateLimited rateLimited:
@@ -122,9 +136,11 @@ public class TranslationsController(TranslationService translationService) : Con
 
             default:
                 throw new ArgumentOutOfRangeException(
-                    nameof(outcome),
-                    outcome,
                     "Unhandled translation outcome.");
         }
     }
+
+    private static string SecondsUntil(DateTimeOffset instant) =>
+        Math.Max(1, (int)Math.Ceiling((instant - DateTimeOffset.UtcNow).TotalSeconds))
+        .ToString(CultureInfo.InvariantCulture);
 }

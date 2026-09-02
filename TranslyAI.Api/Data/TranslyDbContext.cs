@@ -44,6 +44,9 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
             entity.Property(u => u.Tone)
                 .HasConversion<string>()
                 .HasMaxLength(16);
+
+            entity.HasIndex(usage => usage.UserId);
+            entity.HasIndex(usage => new { usage.UserId, usage.CreatedAtUtc });
         });
     }
 }

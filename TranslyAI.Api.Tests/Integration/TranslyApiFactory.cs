@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -15,6 +16,8 @@ public sealed class TranslyApiFactory : WebApplicationFactory<Program>
     public const string TestModel = "test-model";
 
     public GeminiStubHandler Gemini { get; } = new();
+
+    public const int RequestsPerDay = 2;
 
 
     public TranslyApiFactory()
@@ -43,6 +46,7 @@ public sealed class TranslyApiFactory : WebApplicationFactory<Program>
                 ["Jwt:Audience"] = "transly-tests",
                 ["Jwt:SigningKey"] = "integration-tests-signing-key-0123456789",
                 ["Jwt:AccessTokenMinutes"] = "5",
+                ["Quota:RequestsPerDay"] = RequestsPerDay.ToString(CultureInfo.InvariantCulture),
             });
         });
 

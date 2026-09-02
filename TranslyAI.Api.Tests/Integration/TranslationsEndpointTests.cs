@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
+using TranslyAI.Api.Entities;
 using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Tests.Integration;
@@ -103,6 +104,90 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
         Assert.Equal(0, await db.CachedTranslations.CountAsync());
     }
 
+    // ── 4. عدّى حدّه = 429، وGemini مبيتنداش ────────────────────
+
+    [Fact]
+    public async Task Translate_WhenQuotaIsExhausted_ReturnsTooManyRequestsWithoutCallingGemini()
+    {
+        factory.Gemini.RespondWith = () => GeminiCompleted("مرحبا");
+
+        var client = factory.CreateClient();
+        const string email = "quota@transly.test";
+
+        var token = await RegisterAndLoginViaApiAsync(client, email);
+        await SeedUsageAsync(email, TranslyApiFactory.RequestsPerDay);
+
+        var response = await TranslateAsync(client, token);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        Assert.Equal(0, factory.Gemini.CallCount);
+
+        Assert.Equal(TranslyApiFactory.RequestsPerDay.ToString(), Header(response, "X-RateLimit-Limit"));
+        Assert.Equal("0", Header(response, "X-RateLimit-Remaining"));
+        Assert.InRange(response.Headers.RetryAfter!.Delta!.Value, TimeSpan.Zero, TimeSpan.FromDays(1));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
+
+        Assert.Equal(TranslyApiFactory.RequestsPerDay, await db.TranslationUsages.CountAsync());
+        Assert.Equal(0, await db.CachedTranslations.CountAsync());
+    }
+
+    // ── 5. الكاش مش باب خلفي حوالين الـ quota ──────────────────
+
+    [Fact]
+    public async Task Translate_WhenQuotaIsExhaustedAndTextIsCached_StillReturnsTooManyRequests()
+    {
+        factory.Gemini.RespondWith = () => GeminiCompleted("مرحبا");
+
+        var client = factory.CreateClient();
+        const string email = "cached-quota@transly.test";
+
+        var token = await RegisterAndLoginViaApiAsync(client, email);
+
+        var first = await TranslateAsync(client, token);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(
+            (TranslyApiFactory.RequestsPerDay - 1).ToString(),
+            Header(first, "X-RateLimit-Remaining"));
+
+        await SeedUsageAsync(email, TranslyApiFactory.RequestsPerDay - 1);
+
+        var second = await TranslateAsync(client, token);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.Equal(1, factory.Gemini.CallCount);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
+
+        Assert.Equal(1, await db.CachedTranslations.CountAsync());
+        Assert.Equal(TranslyApiFactory.RequestsPerDay, await db.TranslationUsages.CountAsync());
+    }
+
+    // ── 6. استهلاك امبارح مبيتحسبش النهاردة ────────────────────
+
+    [Fact]
+    public async Task Translate_WhenYesterdaysUsageFillsTheQuota_StillAllowsTranslating()
+    {
+        factory.Gemini.RespondWith = () => GeminiCompleted("مرحبا");
+
+        var client = factory.CreateClient();
+        const string email = "yesterday@transly.test";
+
+        var token = await RegisterAndLoginViaApiAsync(client, email);
+        await SeedUsageAsync(email, TranslyApiFactory.RequestsPerDay, DateTime.UtcNow.AddDays(-1));
+
+        var response = await TranslateAsync(client, token);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            (TranslyApiFactory.RequestsPerDay - 1).ToString(),
+            Header(response, "X-RateLimit-Remaining"));
+    }
+
+
     // ── الأدوات ──────────────────────────────────────────────
 
     private static object AnyTranslation() => new
@@ -163,5 +248,35 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
         };
+    }
+
+    private static string Header(HttpResponseMessage response, string name) =>
+    response.Headers.GetValues(name).Single();
+
+    private async Task SeedUsageAsync(string email, int rows, DateTime? createdAtUtc = null)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
+
+        var userId = await db.Users
+            .Where(user => user.Email == email)
+            .Select(user => user.Id)
+            .SingleAsync();
+
+        for (var i = 0; i < rows; i++)
+        {
+            db.TranslationUsages.Add(new TranslationUsage
+            {
+                UserId = userId,
+                SourceLanguage = "en",
+                TargetLanguage = "ar",
+                Tone = TranslationTone.Casual,
+                CharacterCount = 11,
+                Source = TranslationSource.Gemini,
+                CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
+            });
+        }
+
+        await db.SaveChangesAsync();
     }
 }
