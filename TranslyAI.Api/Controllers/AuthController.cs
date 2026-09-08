@@ -12,9 +12,9 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
 {
 
     [HttpPost("register")]
-    [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<RegisterResponse>> Register(
+    public async Task<ActionResult<UserResponse>> Register(
         RegisterRequest request,
         CancellationToken cancellationToken)
     {
@@ -34,15 +34,7 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
             });
         }
 
-        var response = new RegisterResponse
-        {
-            Id = user.Id,
-            Email = user.Email,
-            UserName = user.UserName,
-            CreatedAt = new DateTimeOffset(user.CreatedAtUtc, TimeSpan.Zero),
-        };
-
-        return StatusCode(StatusCodes.Status201Created, response);
+        return StatusCode(StatusCodes.Status201Created, UserResponse.From(user));
     }
 
     [HttpPost("login")]
@@ -73,15 +65,16 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
         {
             AccessToken = token,
             TokenType = "Bearer",
-            ExpiresAt = expiresAt
+            ExpiresAt = expiresAt,
+            User = UserResponse.From(user)
         });
     }
 
     [Authorize]
     [HttpGet("me")]
-    [ProducesResponseType<MeResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public ActionResult<MeResponse> Me()
+    public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
 
@@ -90,6 +83,13 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
             return Unauthorized();
         }
 
-        return Ok(new MeResponse { Id = userId.Value });
+        var profile = await authService.GetProfileAsync(userId.Value, cancellationToken);
+
+        if (profile is null)
+        {
+            return Unauthorized();
+        }
+
+        return Ok(profile);
     }
 }

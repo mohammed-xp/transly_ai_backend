@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
 using TranslyAI.Api.Data;
+using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
 
 namespace TranslyAI.Api.Services;
@@ -88,6 +89,18 @@ public class AuthService(
                 );
         }
     }
+
+    public Task<UserResponse?> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
+        => dbContext.Users
+            .Where(u => u.Id == userId)
+            .Select(u => new UserResponse
+            {
+                Id = u.Id,
+                Email = u.Email,
+                UserName = u.UserName,
+                CreatedAt = new DateTimeOffset(u.CreatedAtUtc, TimeSpan.Zero)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
     private static string NormalizeEmail(string email)
         => email.Trim().ToLowerInvariant();
