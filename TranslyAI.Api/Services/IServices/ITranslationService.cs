@@ -5,7 +5,7 @@ namespace TranslyAI.Api.Services.IServices
     public interface ITranslationService
     {
         Task<TranslationResult> TranslateAsync(
-        TranslationRequest request,
+        TranslationRequestDto request,
         Guid userId,
         CancellationToken cancellationToken);
     }

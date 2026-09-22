@@ -20,7 +20,7 @@ public class TranslationService(
     private readonly int _requestsPerDay = quotaOptions.Value.RequestsPerDay;
 
     public async Task<TranslationResult> TranslateAsync(
-        TranslationRequest request,
+        TranslationRequestDto request,
         Guid userId,
         CancellationToken cancellationToken)
     {
@@ -52,7 +52,7 @@ public class TranslationService(
 
     }
 
-    private static string BuildCacheKey(TranslationRequest request)
+    private static string BuildCacheKey(TranslationRequestDto request)
     {
         var material = $"{request.SourceLanguage}\n{request.TargetLanguage}\n{request.Tone}\n{request.Text}";
 
@@ -60,7 +60,7 @@ public class TranslationService(
     }
 
     private async Task RecordUsageAsync(
-        TranslationRequest request,
+        TranslationRequestDto request,
         Guid userId,
         TranslationSource source,
         CancellationToken cancellationToken)
@@ -82,7 +82,7 @@ public class TranslationService(
     private static int CountCharacters(string text) => text.EnumerateRunes().Count();
 
     private async Task<TranslationOutcome> TranslateWithinQuotaAsync(
-        TranslationRequest request,
+        TranslationRequestDto request,
         Guid userId,
         CancellationToken cancellationToken)
     {

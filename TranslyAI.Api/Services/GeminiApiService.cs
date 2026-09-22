@@ -29,7 +29,7 @@ public class GeminiApiService : IGeminiApiService
 
     public string ModelName() => _options.Model;
 
-    public async Task<TranslationOutcome> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
+    public async Task<TranslationOutcome> TranslateAsync(TranslationRequestDto translationRequest, CancellationToken cancellationToken)
     {
         string toneInstruction = translationRequest.Tone switch
         {

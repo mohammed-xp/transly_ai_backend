@@ -1,4 +1,4 @@
-namespace TranslyAI.Api.Dtos;
+namespace TranslyAI.Api.Common;
 
 public record Language
 {

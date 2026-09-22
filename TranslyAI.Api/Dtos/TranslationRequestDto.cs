@@ -5,7 +5,7 @@ using TranslyAI.Api.Validation;
 
 namespace TranslyAI.Api.Dtos;
 
-public record TranslationRequest : IValidatableObject
+public record TranslationRequestDto : IValidatableObject
 {
     public required string Text { get; init; }
     [SupportedLanguage]

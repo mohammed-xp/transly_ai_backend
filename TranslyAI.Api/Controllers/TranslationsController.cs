@@ -16,11 +16,11 @@ namespace TranslyAI.Api.Controllers;
 public class TranslationsController(ITranslationService translationService) : ControllerBase
 {
     [HttpPost]
-    [ProducesResponseType<ApiResponse<TranslationResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<TranslationResponseDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status429TooManyRequests)]
-    public async Task<ActionResult<ApiResponse<TranslationResponse>>> Translate(
-        TranslationRequest translation,
+    public async Task<ActionResult<ApiResponse<TranslationResponseDto>>> Translate(
+        TranslationRequestDto translation,
         CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
@@ -44,7 +44,7 @@ public class TranslationsController(ITranslationService translationService) : Co
         switch (result.Outcome)
         {
             case TranslationOutcome.Success success:
-                return Ok(new TranslationResponse
+                return Ok(new TranslationResponseDto
                 {
                     SourceText = request.Text,
                     TranslatedText = success.Text,

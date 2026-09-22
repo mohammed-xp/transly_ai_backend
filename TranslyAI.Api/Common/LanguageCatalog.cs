@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using TranslyAI.Api.Dtos;
 
 namespace TranslyAI.Api.Common;
 

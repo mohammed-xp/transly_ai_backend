@@ -2,7 +2,7 @@ using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Dtos;
 
-public record TranslationResponse
+public record TranslationResponseDto
 {
     public required string SourceText { get; init; }
     public required string TranslatedText { get; init; }
