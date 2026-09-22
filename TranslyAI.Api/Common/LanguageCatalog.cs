@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using TranslyAI.Api.Dtos;
 
-namespace TranslyAI.Api.Services;
+namespace TranslyAI.Api.Common;
 
 public static class LanguageCatalog
 {

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using TranslyAI.Api.Common;
 using TranslyAI.Api.Dtos;
-using TranslyAI.Api.Services;
 
 namespace TranslyAI.Api.Controllers;
 

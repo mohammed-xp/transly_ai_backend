@@ -4,6 +4,7 @@ namespace TranslyAI.Api.Entities;
 
 public class User
 {
+    [Key]
     public Guid Id { get; set; }
     [MaxLength(254)]
     public required string Email { get; set; }

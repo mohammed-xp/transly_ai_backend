@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TranslyAI.Api.Dtos;
 
-public record RegisterRequest
+public record RegisterRequestDto
 {
     [EmailAddress]
     [StringLength(254, MinimumLength = 6)]

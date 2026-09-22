@@ -1,20 +1,21 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
 using TranslyAI.Api.Enums;
+using TranslyAI.Api.Services.IServices;
 
 namespace TranslyAI.Api.Services;
 
 public class TranslationService(
     TranslyDbContext dbContext,
-    GeminiApiService geminiApiService,
+    IGeminiApiService geminiApiService,
     IOptions<QuotaOptions> quotaOptions,
-    ILogger<TranslationService> logger)
+    ILogger<TranslationService> logger) : ITranslationService
 {
     private readonly int _requestsPerDay = quotaOptions.Value.RequestsPerDay;
 
@@ -88,7 +89,7 @@ public class TranslationService(
 
         var cacheKey = BuildCacheKey(request);
 
-        var model = geminiApiService.ModelName;
+        var model = geminiApiService.ModelName();
 
         var cached = await dbContext.CachedTranslations
             .AsNoTracking()

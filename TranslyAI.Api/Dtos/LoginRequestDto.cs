@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TranslyAI.Api.Dtos;
 
-public record LoginRequest
+public record LoginRequestDto
 {
     [StringLength(254, MinimumLength = 1)]
     public required string Email { get; init; }

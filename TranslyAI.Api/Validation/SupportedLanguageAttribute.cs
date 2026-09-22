@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using TranslyAI.Api.Services;
+using TranslyAI.Api.Common;
 
 namespace TranslyAI.Api.Validation;
 

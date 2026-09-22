@@ -1,14 +1,15 @@
+using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Dtos.Gemini;
 using TranslyAI.Api.Enums;
+using TranslyAI.Api.Services.IServices;
 
 namespace TranslyAI.Api.Services;
 
-public class GeminiApiService
+public class GeminiApiService : IGeminiApiService
 {
     private readonly ILogger<GeminiApiService> _logger;
     private readonly HttpClient _httpClient;
@@ -24,7 +25,9 @@ public class GeminiApiService
         _httpClient.DefaultRequestHeaders.Add("x-goog-api-key", _options.ApiKey);
     }
 
-    public string ModelName => _options.Model;
+    //public string ModelName => _options.Model;
+
+    public string ModelName() => _options.Model;
 
     public async Task<TranslationOutcome> TranslateAsync(TranslationRequest translationRequest, CancellationToken cancellationToken)
     {

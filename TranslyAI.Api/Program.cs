@@ -1,16 +1,19 @@
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using Scalar.AspNetCore;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
 using TranslyAI.Api.Services;
+using TranslyAI.Api.Services.IServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,17 +63,15 @@ builder.Services.AddAutoMapper(option =>
 });
 
 
-builder.Services.AddHttpClient<GeminiApiService>(client =>
+builder.Services.AddHttpClient<IGeminiApiService, GeminiApiService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
-builder.Services.AddSingleton<JwtTokenService>();
-builder.Services.AddScoped<AuthService>();
 
-
-builder.Services.AddScoped<TranslationService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -108,6 +109,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Components ??= new();
+        document.Components.SecuritySchemes = new Dictionary<string, IOpenApiSecurityScheme>
+        {
+            ["Bearer"] = new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description = "Enter JWT Bearer token"
+            }
+        };
+
+        document.Security = [
+            new OpenApiSecurityRequirement{
+                {new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
+            }
+        ];
+
+        return Task.CompletedTask;
+    });
+});
+
 builder.Services.AddAuthorization();
 
 
@@ -118,6 +146,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseAuthentication();

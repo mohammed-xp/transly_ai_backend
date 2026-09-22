@@ -3,91 +3,122 @@ using Microsoft.AspNetCore.Mvc;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services;
+using TranslyAI.Api.Services.IServices;
 
 namespace TranslyAI.Api.Controllers;
 
 [ApiController]
-[Route("v1/[controller]")]
-public class AuthController(AuthService authService, JwtTokenService jwtTokenService) : ControllerBase
+[Route("api/v1/[controller]")]
+public class AuthController(IAuthService authService) : ControllerBase
 {
 
     [HttpPost("register")]
-    [ProducesResponseType<UserDto>(StatusCodes.Status201Created)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserDto>> Register(
-        RegisterRequest request,
+    [ProducesResponseType<ApiResponse<UserDto>>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ApiResponse<UserDto>>> Register(
+        RegisterRequestDto request,
         CancellationToken cancellationToken)
     {
-        var userDto = await authService.RegisterAsync(
+        try
+        {
+            if (request == null)
+            {
+                return BadRequest(ApiResponse<object>.BadRequest("Registration data is required"));
+            }
+
+            if (await authService.IsEmailExistsAsync(request.Email, cancellationToken))
+            {
+                return Conflict(ApiResponse<object>.Conflict($"User with email '{request.Email}' already exists"));
+            }
+
+            var userDto = await authService.RegisterAsync(
             request,
             cancellationToken
         );
 
-        if (userDto is null)
-        {
-            return Conflict(new ProblemDetails
+            if (userDto is null)
             {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Email already registered."
-            });
+                return Conflict(ApiResponse<object>.Conflict($"User with email '{request.Email}' already exists"));
+            }
+            var response = ApiResponse<UserDto>.CreatedAt(userDto, "User registered successfully");
+            return CreatedAtAction(nameof(Register), response);
         }
-
-        return StatusCode(StatusCodes.Status201Created, userDto);
+        catch (Exception ex)
+        {
+            var errorResponse = ApiResponse<object>.Error(500, "An error occurred during register", ex.Message);
+            return StatusCode(500, errorResponse);
+        }
     }
 
     [HttpPost("login")]
-    [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<LoginResponse>> Login(
-        LoginRequest request,
+    [ProducesResponseType<ApiResponse<LoginResponseDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ApiResponse<LoginResponseDto>>> Login(
+        LoginRequestDto request,
         CancellationToken cancellationToken
     )
     {
-        var user = await authService.LoginAsync(
-            request.Email,
-            request.Password,
-            cancellationToken);
-
-        if (user is null)
+        try
         {
-            return Unauthorized(new ProblemDetails
+            if (request == null)
             {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "Invalid email or password."
-            });
+                return BadRequest(ApiResponse<object>.BadRequest("Login data is required"));
+            }
+            var loginResponse = await authService.LoginAsync(
+                request,
+                cancellationToken);
+
+            if (loginResponse is null)
+            {
+                return Unauthorized();
+
+            }
+
+            var response = ApiResponse<LoginResponseDto>.Ok(loginResponse, "User logged in successfully");
+
+            return Ok(response);
         }
-
-        var (token, expiresAt) = jwtTokenService.CreateAccessToken(user);
-
-        return Ok(new LoginResponse
+        catch (Exception ex)
         {
-            AccessToken = token,
-            TokenType = "Bearer",
-            ExpiresAt = expiresAt,
-            User = UserDto.From(user)
-        });
+            var errorResponse = ApiResponse<object>.Error(500, "An error occurred during login", ex.Message);
+            return StatusCode(500, errorResponse);
+        }
     }
 
     [Authorize]
     [HttpGet("me")]
-    [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<UserDto>> Me(CancellationToken cancellationToken)
+    [ProducesResponseType<ApiResponse<UserDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<UserDto>>> Me(CancellationToken cancellationToken)
     {
-        var userId = User.GetUserId();
-
-        if (userId is null)
+        try
         {
-            return Unauthorized();
+            var userId = User.GetUserId();
+
+            if (userId is null)
+            {
+                return Unauthorized();
+            }
+
+            var profile = await authService.GetProfileAsync(userId.Value, cancellationToken);
+
+            if (profile is null)
+            {
+                return Unauthorized();
+            }
+
+            var response = ApiResponse<UserDto>.Ok(profile, "User received successfully");
+
+            return Ok(response);
         }
-
-        var profile = await authService.GetProfileAsync(userId.Value, cancellationToken);
-
-        if (profile is null)
+        catch (Exception ex)
         {
-            return Unauthorized();
+            var errorResponse = ApiResponse<object>.Error(500, "An error occurred during received user", ex.Message);
+            return StatusCode(500, errorResponse);
         }
-
-        return Ok(profile);
     }
 }
