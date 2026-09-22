@@ -12,20 +12,18 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
 {
 
     [HttpPost("register")]
-    [ProducesResponseType<UserResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<UserDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserResponse>> Register(
+    public async Task<ActionResult<UserDto>> Register(
         RegisterRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await authService.RegisterAsync(
-            request.Email,
-            request.UserName,
-            request.Password,
+        var userDto = await authService.RegisterAsync(
+            request,
             cancellationToken
         );
 
-        if (user is null)
+        if (userDto is null)
         {
             return Conflict(new ProblemDetails
             {
@@ -34,7 +32,7 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
             });
         }
 
-        return StatusCode(StatusCodes.Status201Created, UserResponse.From(user));
+        return StatusCode(StatusCodes.Status201Created, userDto);
     }
 
     [HttpPost("login")]
@@ -66,15 +64,15 @@ public class AuthController(AuthService authService, JwtTokenService jwtTokenSer
             AccessToken = token,
             TokenType = "Bearer",
             ExpiresAt = expiresAt,
-            User = UserResponse.From(user)
+            User = UserDto.From(user)
         });
     }
 
     [Authorize]
     [HttpGet("me")]
-    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)
+    public async Task<ActionResult<UserDto>> Me(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
 

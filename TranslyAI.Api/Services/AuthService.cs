@@ -1,25 +1,26 @@
+using AutoMapper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Services.IServices;
 
 namespace TranslyAI.Api.Services;
 
 public class AuthService(
     TranslyDbContext dbContext,
     IPasswordHasher<User> passwordHasher,
-    ILogger<AuthService> logger)
+    ILogger<AuthService> logger,
+    IMapper mapper) : IAuthService
 {
 
-    public async Task<User?> RegisterAsync(
-        string email,
-        string userName,
-        string password,
+    public async Task<UserDto?> RegisterAsync(
+        RegisterRequest registerRequest,
         CancellationToken cancellationToken)
     {
-        var normalizedEmail = NormalizeEmail(email);
+        var normalizedEmail = NormalizeEmail(registerRequest.Email);
 
         if (await dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
         {
@@ -30,12 +31,12 @@ public class AuthService(
         {
             Id = Guid.CreateVersion7(),
             Email = normalizedEmail,
-            UserName = userName,
+            UserName = registerRequest.UserName,
             PasswordHash = string.Empty,
             CreatedAtUtc = DateTime.UtcNow
         };
 
-        user.PasswordHash = passwordHasher.HashPassword(user, password);
+        user.PasswordHash = passwordHasher.HashPassword(user, registerRequest.Password);
 
         dbContext.Users.Add(user);
 
@@ -49,7 +50,7 @@ public class AuthService(
             return null;
         }
 
-        return user;
+        return mapper.Map<UserDto>(user);
     }
 
     public async Task<User?> LoginAsync(
@@ -90,10 +91,10 @@ public class AuthService(
         }
     }
 
-    public Task<UserResponse?> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
+    public Task<UserDto?> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
         => dbContext.Users
             .Where(u => u.Id == userId)
-            .Select(u => new UserResponse
+            .Select(u => new UserDto
             {
                 Id = u.Id,
                 Email = u.Email,

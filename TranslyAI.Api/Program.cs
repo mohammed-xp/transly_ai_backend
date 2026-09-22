@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
+using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
 using TranslyAI.Api.Services;
 
@@ -52,6 +53,11 @@ builder.Services.AddOptions<QuotaOptions>()
     .Bind(builder.Configuration.GetSection("Quota"))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+
+builder.Services.AddAutoMapper(option =>
+{
+    option.CreateMap<User, UserDto>().ReverseMap();
+});
 
 
 builder.Services.AddHttpClient<GeminiApiService>(client =>

@@ -1,4 +1,3 @@
 <Solution>
-  <Project Path="TranslyAI.Api.Tests/TranslyAI.Api.Tests.csproj" />
-  <Project Path="TranslyAI.Api/TranslyAI.Api.csproj" />
+  <Project Path="TranslyAi_API/TranslyAi_API.csproj" />
 </Solution>

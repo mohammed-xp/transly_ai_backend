@@ -46,7 +46,7 @@ public class AuthEndpointTests(TranslyApiFactory factory)
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
 
         var me = await client.SendAsync(request);
-        var meBody = await me.Content.ReadFromJsonAsync<UserResponse>();
+        var meBody = await me.Content.ReadFromJsonAsync<UserDto>();
 
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         Assert.Equal(Email, meBody!.Email);
