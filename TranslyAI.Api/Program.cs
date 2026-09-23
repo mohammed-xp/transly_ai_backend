@@ -62,7 +62,9 @@ builder.Services.AddOptions<QuotaOptions>()
 
 builder.Services.AddAutoMapper(option =>
 {
-    option.CreateMap<User, UserDto>().ReverseMap();
+    option.CreateMap<User, UserDto>()
+        .ForMember(d => d.CreatedAt, o => o.MapFrom(s => new DateTimeOffset(s.CreatedAtUtc, TimeSpan.Zero)))
+        .ReverseMap();
 });
 
 

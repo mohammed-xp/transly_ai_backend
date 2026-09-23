@@ -140,6 +140,17 @@
 - **↩️ رد: «انا عايز استخدم auto mapper»** → الخطوة 5 اتبدلت (قرار #28): `TranslyAI.Api/Mapping/UserProfile.cs` بـ `ForMember` للـ `CreatedAt` · `AddMaps` في `Program.cs` · `ProjectTo` في `GetProfileAsync` · `UserDto.From` اتشال · `ReverseMap` اتشال · تيست `TranslyAI.Api.Tests/Mapping/MappingConfigurationTests.cs`. متجرّب: **16/16**. **Break check:** شيل الـ `ForMember` → تيست الـ configuration بس اللي حمّر؛ `Login_ReturnsTheSameUserPayloadAsMe` فضل أخضر لأن الاتنين بقوا على نفس الـ mapping. اتقاله.
 - **الجزء (أ) مايتحسبش دليل إنه يكتب ده لوحده.** الـ review هيحكم على اللي شغّله وغيّره.
 
+## 📍 حالة 2026-09-23 بعد `680d39b` («عايز ابدأ تاسك» — فحص حالة، مش review)
+
+**اتشغّل:** build `--no-incremental` 0 warnings · `dotnet test` → **14/15** · `format` واقع.
+- **`Login_ReturnsTheSameUserPayloadAsMe` أحمر:** bug الـ `CreatedAt = 0001-01-01` لسه عايش. الكوميت فيه `AddAutoMapper` بس — `Mapping/UserProfile.cs` والـ `ForMember` وتيست `MappingConfigurationTests` (خطوة 5 بعد قرار #28) متطبقوش.
+- **`format`:** whitespace في `TranslyApiFactory.cs:54-58`.
+- الجزء (أ) متقفلش لسه بسبب الاتنين دول. ب · ج · د متبدأوش.
+- اتعرض عليه: يكمّل 018 (الترشيح) ولا يقفلها عند (أ) وياخد اتجاه جديد بعد review للي اتعمل.
+- **رده: «مش عايز اكتب تستات خلاص»** → اتعرض عليه 3 اختيارات (مفيش تيستات جديدة والموجودة تفضل خضرا [الترشيح] · التيستات في «ساعدني» · شيلها كلها). **مستني رده**، ولسه متسجّلش في `decisions.md`.
+- **شاف الـ bug بنفسه في Postman** (`createdAt: 0001-01-01` في الـ login) وسأل «ازاي؟» → Explain: الـ mapping بالاسم (`CreatedAtUtc` ≠ `CreatedAt`)، و`required` مش بيحمي من الـ reflection، و`/me` سليم لأنه `Select` بالإيد، وتحويل `DateTime` Unspecified → `DateTimeOffset` بياخد offset السيرفر. اتعرض `AssertConfigurationIsValid()` وقت الـ startup كحارس من غير تيست.
+- **«تمام اصلحت المشكلة» (working tree، مش متكوميت):** `ForMember` في `Program.cs:66-68` بـ `TimeSpan.Zero` → **15/15**، build 0 warnings. الحارس هو `Login_ReturnsTheSameUserPayloadAsMe` (بيقارن الـ mapping بالـ `Select` اليدوي في `/me`) — الكسر اتشاف فعلاً قبل التصليح. **🟡** `using Google.Protobuf.WellKnownTypes;` اتضاف في `Program.cs:1` (auto-import من dependency ترانزيتيف لـ `MySql.Data`، مش مستخدم، وفيه `Type`/`Enum`/`Timestamp` هيعملوا ambiguity). **🔵** `o=>` من غير مسافة. `format` لسه واقع في `TranslyApiFactory.cs:54-58`. `AssertConfigurationIsValid` متضافش (اختياري).
+
 ## 🪤 الفخاخ (للـ mentor — متتقالش قبل الـ review)
 
 > بعد التعديل: فخ الـ `OnChallenge` وفخ `InvalidOperationException → 409` وفخ الـ `CS0162` مبقوش ليهم لازمة (الأولاني لأن `UseStatusCodePages` + `AddProblemDetails` اتعملوا صح، والتالت اتشال في r1). ترتيب الـ middleware اتعدّى في r1. الباقي قايم: الـ stub مش متوصّل · `ClientErrorResultFilter` (بقى في صالحه، `Unauthorized()` بترجع ProblemDetails لوحدها) · مفتاح `TargetLanguage`. **وفخ جديد:** في الـ Development، الـ developer exception page مع `AddProblemDetails` بترجّع ProblemDetails **فيها الـ exception والـ stack trace** — تيست الـ 500 بيعدّي في الـ `Testing` environment، بس لو حد شغّل الـ API بـ `Development` على سيرفر حقيقي هيسرّب.

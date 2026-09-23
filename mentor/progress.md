@@ -34,7 +34,7 @@
 ## الوضع الحالي
 
 - **الاتجاه:** 🚧 **M4 — [TASK-018](tasks/TASK-018.md)** اختياره 2026-09-23 من 3 (CI · M4 · refresh tokens؛ الترشيح كان CI). **M8** لسه الاتجاه الأكبر (طلبه 2026-09-02)، ⬜ متقسّمش ومستني إجابتين: **الـ host** · **الـ Gemini tier** (الـ free tier = 20 request/يوم).
-- **التاسك المفتوحة:** [TASK-018](tasks/TASK-018.md) — `ApiResponse<T>` على كل رد. وقت الكتابة كان بدأ الجزء (أ) في الـ working tree (الـ `slnx` + الـ compile).
+- **التاسك المفتوحة:** [TASK-018](tasks/TASK-018.md) — الجزء (أ) اتكوميت في `680d39b`، وbug الـ `CreatedAt` اتصلح بعده (مش متكوميت). ناقص `format`. ب/ج/د لسه. **قال «مش عايز اكتب تستات خلاص»** — اتعرض عليه 3 اختيارات ومستني رده.
 - **شغل من غير ticket (2026-09-09 → 2026-09-23) — لسه متراجعش:** `a151f48` · `b31a204` · `025d3c4` · `4ccca52` · `ff7fdd2` · `07b472f`. فيه: envelope `ApiResponse<T>` على الردود · interfaces للـ services · AutoMapper · الـ DTOs اتسمّت `*Dto` · الـ routes بقت `api/v1/...` · تعديل في `AuthEndpointTests`.
   - **#7 و#11 اتقلبوا بقراره 2026-09-23** (`api/v1` · envelope للنجاح وProblemDetails للفشل). #27 اتسحب قبل التنفيذ. **#4** بيتصلح في TASK-018. **#15** (الـ interfaces) لسه مفتوح — الجدول في أول [decisions.md](decisions.md).
   - **اتشاف وقت الضغط (قراية، مش review):** [TranslationsController.cs:57](../TranslyAI.Api/Controllers/TranslationsController.cs#L57) بيعمل `return Ok();` والـ `response` اللي اتبنى فوقه مبيترجعش — الترجمة الناجحة بترجع 200 من غير body.
@@ -63,7 +63,7 @@
 | [TASK-015](tasks/TASK-015.md) | أول integration tests — `WebApplicationFactory` + MySQL حقيقية | M7 | ✅ Approved r2 |
 | [TASK-016](tasks/TASK-016.md) | quota لكل مستخدم + 429 + `X-RateLimit-*` | العدّاد (M5→M6) | ✅ Approved r2 |
 | [TASK-017](tasks/TASK-017.md) | `GET /v1/translations` — history + pagination | M5→M6 | ❌ اتلغت بقراره قبل أي كود |
-| [TASK-018](tasks/TASK-018.md) | error contract: `ApiResponse<T>` للنجاح + ProblemDetails للفشل | M4 | 🔁 r2 — 7/14 حمرا (التيستات بتقرا الـ DTO من غير الـ envelope)، ب/ج/د لسه |
+| [TASK-018](tasks/TASK-018.md) | error contract: `ApiResponse<T>` للنجاح + ProblemDetails للفشل | M4 | 🔁 (أ) — `CreatedAt` اتصلح (15/15، مش متكوميت) · `format` لسه واقع · قرار التيستات مستني رده · ب/ج/د لسه |
 
 **الكود اتسلّم كامل في «ساعدني» في:** TASK-010 · 012 · 013 · 014 · 015 · 016 · 018 (الجزء أ بس) — التقييم فيهم على التشغيل والقرارات اللي غيّرها، مش على الكتابة.
 
