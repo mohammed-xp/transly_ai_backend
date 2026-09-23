@@ -44,7 +44,7 @@ public class TranslationsController(ITranslationService translationService) : Co
         switch (result.Outcome)
         {
             case TranslationOutcome.Success success:
-                return Ok(new TranslationResponseDto
+                var response = ApiResponse<TranslationResponseDto>.Ok(new TranslationResponseDto
                 {
                     SourceText = request.Text,
                     TranslatedText = success.Text,
@@ -53,7 +53,8 @@ public class TranslationsController(ITranslationService translationService) : Co
                     Model = success.Model,
                     Tone = request.Tone,
                     CreatedAt = success.CreatedAt,
-                });
+                }, "Translate successfully");
+                return Ok();
             // 429: الـ quota الخاصة بالمستخدم خلصت.
             case TranslationOutcome.QuotaExceeded:
                 Response.Headers.RetryAfter = SecondsUntil(result.Quota.ResetsAt);
