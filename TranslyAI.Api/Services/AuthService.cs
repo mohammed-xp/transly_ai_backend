@@ -1,13 +1,10 @@
 using AutoMapper;
-using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using MySql.Data.MySqlClient;
-using System.Reflection.Metadata;
 using System.Text;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
@@ -33,7 +30,7 @@ public class AuthService(
 
         if (await IsEmailExistsAsync(normalizedEmail, cancellationToken))
         {
-            throw new InvalidOperationException($"A user with the email '{registerRequest.Email}' already exists");
+            return null;
         }
 
         User user = new()
@@ -54,7 +51,8 @@ public class AuthService(
         }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
-            throw new InvalidOperationException("An error occurred while registering the user", ex);
+            // throw new InvalidOperationException("An error occurred while registering the user", ex);
+            return null;
         }
 
         return mapper.Map<UserDto>(user);

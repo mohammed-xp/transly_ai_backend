@@ -33,12 +33,14 @@
 
 ## الوضع الحالي
 
-- **الاتجاه:** 🎯 **M8 — نطلق المنتج بالـ features الموجودة** (طلبه هو 2026-09-02 بعد ما لغى TASK-017). ⬜ لسه متقسّمش لتاسكات، ومستني إجابتين: **الـ host** · **الـ Gemini tier** (الـ free tier = 20 request/يوم).
-- **التاسك المفتوحة:** مفيش. آخر تاسك اتقفلت TASK-016 ✅، وTASK-017 ❌ اتلغت قبل أي كود.
+- **الاتجاه:** 🚧 **M4 — [TASK-018](tasks/TASK-018.md)** اختياره 2026-09-23 من 3 (CI · M4 · refresh tokens؛ الترشيح كان CI). **M8** لسه الاتجاه الأكبر (طلبه 2026-09-02)، ⬜ متقسّمش ومستني إجابتين: **الـ host** · **الـ Gemini tier** (الـ free tier = 20 request/يوم).
+- **التاسك المفتوحة:** [TASK-018](tasks/TASK-018.md) — `ApiResponse<T>` على كل رد. وقت الكتابة كان بدأ الجزء (أ) في الـ working tree (الـ `slnx` + الـ compile).
 - **شغل من غير ticket (2026-09-09 → 2026-09-23) — لسه متراجعش:** `a151f48` · `b31a204` · `025d3c4` · `4ccca52` · `ff7fdd2` · `07b472f`. فيه: envelope `ApiResponse<T>` على الردود · interfaces للـ services · AutoMapper · الـ DTOs اتسمّت `*Dto` · الـ routes بقت `api/v1/...` · تعديل في `AuthEndpointTests`.
-  - **بيخالف قرارات #4 و#7 و#11 و#15** — الجدول في أول [decisions.md](decisions.md). مش معروف لسه إذا كان تغيير مقصود للقرارات.
+  - **#7 و#11 اتقلبوا بقراره 2026-09-23** (`api/v1` · envelope للنجاح وProblemDetails للفشل). #27 اتسحب قبل التنفيذ. **#4** بيتصلح في TASK-018. **#15** (الـ interfaces) لسه مفتوح — الجدول في أول [decisions.md](decisions.md).
   - **اتشاف وقت الضغط (قراية، مش review):** [TranslationsController.cs:57](../TranslyAI.Api/Controllers/TranslationsController.cs#L57) بيعمل `return Ok();` والـ `response` اللي اتبنى فوقه مبيترجعش — الترجمة الناجحة بترجع 200 من غير body.
-- **التيستات عند آخر review:** 11 (TASK-016). اتعدّلت بعدها في الشغل اللي من غير ticket، والعدد الحالي متراجعش.
+  - **اتأكد بالتشغيل 2026-09-23 (طلب تاسك، مش review):** الـ test project اتشال من `TranslyAI.slnx` في `025d3c4` → `dotnet test` على الـ solution بيشغّل صفر tests. ولوحده مش بيـ compile (`TranslationRequest` في `GeminiApiServiceTests.cs:40`)، والـ integration tests بتضرب `/v1/...` والـ routes بقت `api/v1/...`. ومفيش تيست بيقرا body الترجمة الناجحة — الـ status بس.
+  - **`ex.Message` بيطلع للعميل** في الـ 500 بتاع [AuthController.cs:50](../TranslyAI.Api/Controllers/AuthController.cs#L50).
+- **التيستات عند آخر review:** 11 (TASK-016). النهاردة مش بتـ compile ومش في الـ solution.
 
 ## التاسكات
 
@@ -61,12 +63,13 @@
 | [TASK-015](tasks/TASK-015.md) | أول integration tests — `WebApplicationFactory` + MySQL حقيقية | M7 | ✅ Approved r2 |
 | [TASK-016](tasks/TASK-016.md) | quota لكل مستخدم + 429 + `X-RateLimit-*` | العدّاد (M5→M6) | ✅ Approved r2 |
 | [TASK-017](tasks/TASK-017.md) | `GET /v1/translations` — history + pagination | M5→M6 | ❌ اتلغت بقراره قبل أي كود |
+| [TASK-018](tasks/TASK-018.md) | error contract: `ApiResponse<T>` للنجاح + ProblemDetails للفشل | M4 | 🔁 r2 — 7/14 حمرا (التيستات بتقرا الـ DTO من غير الـ envelope)، ب/ج/د لسه |
 
-**الكود اتسلّم كامل في «ساعدني» في:** TASK-010 · 012 · 013 · 014 · 015 · 016 — التقييم فيهم على التشغيل والقرارات اللي غيّرها، مش على الكتابة.
+**الكود اتسلّم كامل في «ساعدني» في:** TASK-010 · 012 · 013 · 014 · 015 · 016 · 018 (الجزء أ بس) — التقييم فيهم على التشغيل والقرارات اللي غيّرها، مش على الكتابة.
 
 ## القرارات المعمارية
 
-في [decisions.md](decisions.md): 26 قرار + قواعد العمل بتاريخها. آخر قرار اتاخد: **#26 — هوية بحساب حقيقي (email + password)**، 2026-08-30. ⚠️ فيه 4 قرارات الكود الحالي مختلف عنها.
+في [decisions.md](decisions.md): 27 قرار + قواعد العمل بتاريخها. #27 (exception مخصوصة للفشل المتوقع) اتسحب قبل التنفيذ. اتقلب بقراره 2026-09-23: #7 (`api/v1`) و#11 (envelope للنجاح + ProblemDetails للفشل). ⚠️ #4 و#15 الكود لسه مختلف عنهم.
 
 ## خريطة الـ milestones
 
@@ -77,7 +80,7 @@
 | M2 | أول endpoints | ✅ translations · languages · tone |
 | — | الـ AI proxy | ✅ Interactions API + تصنيف الفشل |
 | M3 | EF Core | ✅ TASK-010/011 |
-| M4 | Validation / errors / logging | ⏭️ اتخطّت بوعي 2026-08-30 — ديونها قايمة تحت، وحجة التأجيل («مش واقفة في طريق الـ auth») خلصت |
+| M4 | Validation / errors / logging | 🚧 **TASK-018** (error contract) — Serilog وcorrelation IDs لسه |
 | M5 | Auth | ✅ register · login · `/me` · usage — ⬜ refresh tokens |
 | — | العدّاد والاشتراكات | 🚧 الـ quota ✅ (TASK-016) — الخطط والاشتراكات ⬜ |
 | — | Streaming (SSE) | ⬜ |
@@ -98,7 +101,7 @@
 - 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم** (TASK-003 · رجع في TASK-013 r2 · أخف في TASK-014) → [TASK-004](tasks/TASK-004.md) · [TASK-013](tasks/TASK-013.md)
 - 🟡 **بيعتمد على الـ default بتاع API من غير ما يفتح الـ signature** (TASK-004) → [TASK-004](tasks/TASK-004.md)
 - 🟡 **بيحط guard في المكان الغلط** (TASK-005) → [TASK-005](tasks/TASK-005.md)
-- 🟡 **comment بدل الحذف** ×2 (TASK-005) — التالتة اتسحبت (TASK-007، كانت مقصودة). ⚠️ فيه `return Problem(...)` متعلّق عليه في [TranslationsController.cs:65-69](../TranslyAI.Api/Controllers/TranslationsController.cs#L65-L69) (شغل من غير ticket). → [TASK-005](tasks/TASK-005.md) · [TASK-007](tasks/TASK-007.md)
+- 🟡 **comment بدل الحذف** ×3 — TASK-005 ×2، والتالتة في TASK-018 r1 (AuthController + `AuthService.cs:57`). اللي في TASK-007 اتسحبت لأنها كانت مقصودة. → لو طلب تاسك تبقى مرشحة. ⚠️ فيه `return Problem(...)` متعلّق عليه في [TranslationsController.cs:65-69](../TranslyAI.Api/Controllers/TranslationsController.cs#L65-L69) (شغل من غير ticket). → [TASK-005](tasks/TASK-005.md) · [TASK-007](tasks/TASK-007.md)
 - 🔵 **تايبوهات في أسماء عامة** ×8 — آخرها `X-RateLimitLimit` (TASK-016، أول واحد على عقد خارجي). الحل الميكانيكي لو اتكرر: analyzer. → [TASK-015](tasks/TASK-015.md) · [TASK-016](tasks/TASK-016.md)
 - 🔵 **مفيش newline في آخر الملفات** ×7.
 - بيتّبع الـ snippets الجاهزة حرفياً من غير ما يسأل هي بتعمل ايه (GitHub's "create a new repository on the command line" → commit فيه README بس)
@@ -133,7 +136,7 @@
 - **مفتاح `["TargetLanguage"]` PascalCase + `"differnt"`** — [TranslationRequestDto.cs:26-27](../TranslyAI.Api/Dtos/TranslationRequestDto.cs#L26-L27) — نفس الـ endpoint بيرجّع مفاتيح camelCase وPascalCase. → [TASK-006](tasks/TASK-006.md)
 - **`store: false` وبناء الـ prompt مالهمش حارس** — [GeminiApiService.cs:58](../TranslyAI.Api/Services/GeminiApiService.cs#L58) — قرار خصوصية محدش هيلاحظ لو اتشال. → [TASK-009](tasks/TASK-009.md)
 - **ترتيب `RecordUsageAsync` قبل الكاش مالوش تيست** — دين على الـ mentor، مفيش مسار HTTP deterministic بيمسكه. → [TASK-015](tasks/TASK-015.md)
-- **ديون M4:** `IExceptionHandler` مركزي · Serilog — الاتنين مش موجودين في الكود.
+- **ديون M4:** `IExceptionHandler` مركزي → في TASK-018 · Serilog — لسه. ومفتاح `TargetLanguage` PascalCase اللي فوق بيتقفل بتيست الـ 400 في TASK-018.
 - **`FallbackPolicy`** — اتعرضت 3 مرات ومتاخدتش.
 - **migration فاضية** `20260831142943_EditTranslationUsage` لسه في الريبو — قراره. → [TASK-014](tasks/TASK-014.md)
 - 🔵 `usedCountConsumed` في [TranslationService.cs:49](../TranslyAI.Api/Services/TranslationService.cs#L49) · `[AttributeUsage]` ناقصة على `SupportedLanguageAttribute`.
@@ -149,4 +152,4 @@
 
 ## الجلسة الجاية
 
-الاتجاه اللي طلبه هو M8، والتاسك بتتكتب بس لما يطلبها. لو طلب review للشغل اللي من غير ticket: 4 قرارات اتغيّرت + `return Ok()` اللي بيرمي الرد.
+TASK-018 مفتوحة — لما يقول «خلصت» يبقى review بالكسرات المكتوبة في الـ ticket والفخاخ اللي في آخر ملفها. ولو طلب review للشغل اللي من غير ticket: #15 (interfaces) لسه مفتوح، و`IsEmailExistsAsync` بيعمل `ToLower()` على العمود ومن غير `CancellationToken`.

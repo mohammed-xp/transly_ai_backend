@@ -32,24 +32,23 @@ public class AuthEndpointTests(TranslyApiFactory factory)
     {
         var client = factory.CreateClient();
 
-        await client.PostAsJsonAsync("/v1/auth/register", new
+        await client.PostAsJsonAsync("/api/v1/auth/register", new
         {
             email = Email,
             userName = "profile-user",
             password = Password,
         });
 
-        var login = await client.PostAsJsonAsync("/v1/auth/login", new { email = Email, password = Password });
-        var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { email = Email, password = Password });
+        var loginBody = await ApiResponseAssert.SuccessAsync<LoginResponseDto>(login);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/auth/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody.Token.AccessToken);
 
         var me = await client.SendAsync(request);
-        var meBody = await me.Content.ReadFromJsonAsync<UserDto>();
+        var meBody = await ApiResponseAssert.SuccessAsync<UserDto>(me);
 
-        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
-        Assert.Equal(Email, meBody!.Email);
+        Assert.Equal(Email, meBody.Email);
         Assert.Equal(loginBody.User, meBody);
     }
 
@@ -60,15 +59,15 @@ public class AuthEndpointTests(TranslyApiFactory factory)
     {
         var client = factory.CreateClient();
 
-        await client.PostAsJsonAsync("/v1/auth/register", new
+        await client.PostAsJsonAsync("/api/v1/auth/register", new
         {
             email = Email,
             userName = "profile-user",
             password = Password,
         });
 
-        var login = await client.PostAsJsonAsync("/v1/auth/login", new { email = Email, password = Password });
-        var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { email = Email, password = Password });
+        var loginBody = await ApiResponseAssert.SuccessAsync<LoginResponseDto>(login);
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
@@ -76,11 +75,11 @@ public class AuthEndpointTests(TranslyApiFactory factory)
             await db.Users.ExecuteDeleteAsync();
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/auth/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody.Token.AccessToken);
 
         var me = await client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        await ApiResponseAssert.ProblemAsync(me, HttpStatusCode.Unauthorized);
     }
 }

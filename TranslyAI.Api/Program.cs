@@ -29,7 +29,10 @@ builder.Services.AddControllers(options =>
                 JsonNamingPolicy.CamelCase,
                 allowIntegerValues: false)
         );
-    });
+    }
+);
+
+builder.Services.AddProblemDetails();
 
 builder.Services.AddDbContext<TranslyDbContext>(options =>
     options.UseMySQL(
@@ -141,6 +144,9 @@ builder.Services.AddAuthorization();
 
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

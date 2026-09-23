@@ -39,11 +39,27 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
     {
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/v1/translations", AnyTranslation());
+        var response = await client.PostAsJsonAsync("/api/v1/translations", AnyTranslation());
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains(response.Headers.WwwAuthenticate, header => header.Scheme == "Bearer");
     }
+
+    [Fact]
+    public async Task Translate_WhenGeminiCompletes_ReturnsTheTranslationInTheEnvelope()
+    {
+        factory.Gemini.RespondWith = () => GeminiCompleted("مرحبا");
+
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginViaApiAsync(client, "success@transly.test");
+
+        var response = await TranslateAsync(client, token);
+
+        var translation = await ApiResponseAssert.SuccessAsync<TranslationResponseDto>(response);
+        Assert.Equal("مرحبا", translation.TranslatedText);
+        Assert.Equal(TranslyApiFactory.TestModel, translation.Model);
+    }
+
 
     // ── 2. مستخدمين مختلفين / نفس النص ───────────────────────
 
@@ -200,25 +216,24 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
 
     private static async Task<string> RegisterAndLoginViaApiAsync(HttpClient client, string email)
     {
-        var register = await client.PostAsJsonAsync("/v1/auth/register", new
+        var register = await client.PostAsJsonAsync("/api/v1/auth/register", new
         {
             email,
             userName = email.Split('@')[0] + "-user",
             password = Password,
         });
-        register.EnsureSuccessStatusCode();
+        await ApiResponseAssert.SuccessAsync<UserDto>(register, HttpStatusCode.Created);
 
-        var login = await client.PostAsJsonAsync("/v1/auth/login", new { email, password = Password });
-        login.EnsureSuccessStatusCode();
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = Password });
+        var body = await ApiResponseAssert.SuccessAsync<LoginResponseDto>(login);
 
-        var body = await login.Content.ReadFromJsonAsync<LoginResponse>();
-
-        return body!.AccessToken;
+        return body.Token.AccessToken;
     }
+
 
     private static async Task<HttpResponseMessage> TranslateAsync(HttpClient client, string accessToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/translations")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/translations")
         {
             Content = JsonContent.Create(AnyTranslation()),
         };

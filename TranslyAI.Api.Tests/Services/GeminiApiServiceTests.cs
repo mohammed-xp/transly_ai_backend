@@ -37,7 +37,7 @@ public class GeminiApiServiceTests
         string mediaType = "application/json")
         => new(status) { Content = new StringContent(body, Encoding.UTF8, mediaType) };
 
-    private static TranslationRequest AnyRequest() => new()
+    private static TranslationRequestDto AnyRequest() => new()
     {
         Text = "Hello",
         SourceLanguage = "en",

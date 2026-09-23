@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Services;
+using TranslyAI.Api.Services.IServices;
 using TranslyAI.Api.Tests.Fakes;
 
 namespace TranslyAI.Api.Tests.Integration;
@@ -50,11 +51,12 @@ public sealed class TranslyApiFactory : WebApplicationFactory<Program>
             });
         });
 
-        builder.ConfigureTestServices(services =>
+                builder.ConfigureTestServices(services =>
         {
-            services.AddHttpClient<GeminiApiService>()
+            services.AddHttpClient<IGeminiApiService, GeminiApiService>()
                 .ConfigurePrimaryHttpMessageHandler(() => Gemini);
         });
+
     }
 
     private static string ResolveTestConnectionString()
