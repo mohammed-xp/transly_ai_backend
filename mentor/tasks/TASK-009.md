@@ -185,3 +185,34 @@ dotnet test
 - [ ] فتحت ملف التاسك ده وعدّيت الـ acceptance criteria
 - [ ] dotnet format + git status
 ```
+
+
+---
+
+## 📜 السجل (اتنقل من progress.md في 2026-09-23 — النص زي ما هو)
+
+| TASK-009 | سدّ حدود `TranslateAsync` + الـ stub يقرا الـ request + أول `[Theory]` | M7 | ❌ **اتلغت بطلبه** (2026-08-27) | "مش مقتنع بالتاسك دي · قم بتبديلها". اتبدّلت من غير تفاوض. **الخطأ كان مني**: M7 اتقدّمت لسبب محدد، اتحقق في TASK-008، وكان لازم أرجع للـ curriculum فوراً بدل ما أكمّل بالعطالة. الشغل الفني اللي كان فيها اتسجّل كدين (تسريب الـ charset) وموعده M4 |
+
+- **❌ TASK-009 اتلغت بطلبه** (2026-08-27): **"مش عايز اعمل التعديلات دي · مش مقتنع بالتاسك دي · قم بتبديلها"**. اتبدّلت من غير تفاوض. الملف `mentor/tasks/TASK-009.md` متساب للتاريخ.
+  - **الدرس للـ mentor:** M7 اتقدّمت بقرار مني عشان نمط متكرر، والغرض منها اتحقق في TASK-008. **تاسك تانية ورا بعض في نفس الموضوع كانت زيادة** — التاسك التانية بقت "خلّص اللي فات" مش "شغل جديد"، وهو حسّها كده وهو محق. الإشارة كانت موجودة من رسالته الأولى في الجلسة ("خلصت تاسك 8 وعايز تاسك جديدة") ومقريتهاش.
+  - **قاعدة تتضاف:** بعد ما milestone تتقدّم عشان سبب محدد وتحقق سببها → **ارجع لمسار الـ curriculum فوراً**، متكمّلش فيها بالعطالة.
+
+### 💳 دين مفتوح — تسريب exception من `GeminiApiService` (اتأجل 2026-08-27)
+
+> اتحوّل لـ TASK-009، وTASK-009 اتلغت بطلبه. **الدين قايم ومسجّل بتكلفته**، وميترجعلوش كتاسك مستقلة.
+
+| البند | المكان | التكلفة |
+|---|---|---|
+| `ReadFromJsonAsync` بيرمي `InvalidOperationException` على charset مش معروف — `catch (JsonException)` مش شايفها | `GeminiApiService.cs:99` | **500 بدل 502** عند العميل. بيثقب تصنيف الفشل بتاع TASK-005 |
+| `ReadAsStringAsync` على الـ error body بيرمي نفس الحاجة | `GeminiApiService.cs:81` | نفس الأثر، على مسار الفشل |
+| الـ prompt building (tone switch + حقن اللغات) + `store: false` مالهمش أي حارس | `GeminiApiService.cs:29-54` | `store: false` قرار خصوصية اتاخد في TASK-007 ومحدش هيلاحظ لو اتشال |
+
+**الحل المتحقق منه عملياً (لو رجعنا له):** `ReadAsStreamAsync` + `JsonSerializer.DeserializeAsync` بدل `ReadFromJsonAsync` (الـ stream مبيبصش على الـ charset)، و`ReadAsByteArrayAsync` + `Encoding.UTF8.GetString` بدل `ReadAsStringAsync`.
+**📍 الموعد:** M4 مع الـ `IExceptionHandler` المركزي — هناك بيتحل لكل الـ endpoints مرة واحدة.
+
+**🔎 قاعدة اتعلمناها وتتسجّل:** كل الـ APIs **النصية** على `HttpContent` (`ReadAsStringAsync` / `ReadFromJsonAsync`) بتحوّل الـ `charset` الجاي في الـ header لـ `Encoding` قبل أي حاجة، وبترمي `InvalidOperationException` لو مش معروف. الـ APIs بتاعة **البايتات/الـ stream** مبتبصش على الـ header ده خالص. الفرق مش ظاهر في الـ signature.
+
+**🔴 اللي طلع من الـ review:** `ReadFromJsonAsync` بيرمي **`InvalidOperationException("The character set provided in ContentType is invalid.")`** لما الـ `charset` في الـ `Content-Type` مش معروف — بتترمي وهو بيحوّل الـ charset لـ `Encoding`، يعني **قبل** الـ serializer (اتأكدت عملياً: الحالات التانية وصلت للـ serializer، دي لأ). الـ `catch (JsonException)` في `GeminiApiService.cs:101` مش شايفها → **بتطلع برّه `TranslateAsync`** → **500 عند العميل بدل 502**. ده بيثقب تصنيف الفشل اللي اتبنى في TASK-005.
+
+> **⚠️ درس الجلسة دي — يتقرا قبل كتابة أي ticket جاي:** M7 اتقدّمت بقرار لسبب محدد (نمط متكرر 3 مرات)، السبب اتحقق في TASK-008، وأنا كتبت TASK-009 في نفس الموضوع بالعطالة. **رفضها، وكان محقاً.** الإشارة كانت في رسالته الأولى ("خلصت تاسك 8 و**عايز تاسك جديدة**"). القاعدة: milestone بتتقدّم لسبب → أول ما السبب يتحقق، ارجع لمسار الـ curriculum.
+

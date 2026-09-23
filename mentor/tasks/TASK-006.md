@@ -161,3 +161,63 @@
 ```
 
 أي بند من غير علامة لازم يكون جنبه **سبب معلن**. "نسيت" سبب مقبول — "معملتوش من غير ما أقول" لأ.
+
+
+---
+
+## 📜 السجل (اتنقل من progress.md في 2026-09-23 — النص زي ما هو)
+
+| TASK-006 | `GET /v1/languages` + الكتالوج مصدر وحيد + رفض اللغات غير المدعومة بـ 400 | M2 | ✅ Done (Approved r2) | r1 كان فيها blocker حقيقي: `IValidatableObject` مش معلنة والميثود اسمها `Validation` → الـ `en → en` check **كود ميت** بـ 0 warnings، واتثبت بطلب حقيقي راح لـ Gemini. والـ `Dispose` اتعمل على `_httpClient` (مستعار) بدل `HttpResponseMessage` (مملوك). الاتنين اتصلحوا في r2 واتحققوا عملياً. الجسم الأساسي كان صح من أول مرة — الكتالوج والـ endpoint والـ attribute والـ caching headers كلهم اشتغلوا |
+
+## ✅ الوقوف المقصود اتقفل (2026-08-24)
+
+الطلب الصريح بتاع 2026-08-20 (**"بعد ما اخلص هذه التاسك لا تعطيني تاسك تانية!!!"**) اتحترم — TASK-006 اتكتبت **بعد ما هو طلبها** في جلسة 2026-08-24.
+
+---
+
+## 🎫 TASK-006 — الملخص
+
+**الشكل:** `GET /v1/languages` + كتالوج لغات كـ **مصدر وحيد** + `POST /v1/translations` بيرفض أي كود بره الكتالوج بـ 400 **قبل** ما يكلّم Gemini. الملف: `mentor/tasks/TASK-006.md`.
+
+**الدافع الحقيقي (مش "أول collection response"):** الحقلين `sourceLanguage`/`targetLanguage` دلوقتي **strings حرة بتتحقن مباشرة في prompt رايح لـ LLM** (`GeminiApiService.cs:42`). تلات ثغرات مع بعض: (1) `"banana"` بيتبعت ويتخصم من quota الـ 20/يوم ويرجّع 200 بكلام فاضي، (2) `""` بيعدّي لأن `required` = "الحقل موجود" مش "فيه قيمة"، (3) prompt injection حرفي في الحقل.
+
+**الفخاخ المزروعة (تتراجع في الـ review):**
+- 🪤 **الـ envelope على collection.** التاسك بتذكّره بقرار #11 ("مفيش envelope") **من غير ما تقول هل ينطبق هنا**. لو رجّع `[...]` bare بحجة "القرار قال كده" — يبقى بيطبق قرارات ميكانيكياً مش بيفكر فيها. الإجابة المطلوبة هي **السبب**، أياً كان الاختيار.
+- 🪤 **`[ResponseCache]` مش بيعمل caching.** س2 بتطلب منه يضرب الـ endpoint مرتين ويتأكد بنفسه هل الـ action اشتغلت تاني. الـ attribute بيكتب headers بس؛ الـ server-side caching محتاج middleware/output cache. **ده بالظبط نمطه المسجّل**: الثقة في الـ API من غير ما يفتحه.
+- 🪤 **`ILanguageCatalog`.** التاسك بتحذّره بقرار #15 صراحة. لو عملها برضه لازم يسمّي الـ seam.
+
+**الديون المطوية جواها:** `HttpResponseMessage` dispose (`using var` مش هيمشي على السطر زي ما هو — درس `IDisposable`)، والتعليق المقصوص `// 504:`.
+
+**قرارات مفتوحة سايبها ليه بوعي:** حقول الـ `Language` DTO (باختبار "إيه اللي يكسر لو الـ client hardcode-هُ")، و`en → en` (400 ولا 200؟).
+
+**🆕 تدخّل جديد:** ضفت قسم **"شكل التسليم"** — checklist جاهزة يبعتها متعبّية. ده التدخّل المقترح في المفكرة (بند تخطّي الـ acceptance criteria، 4 مرات)، بس **مطبّق كـ scaffolding مش كعقاب** — قبل التكرار الخامس مش بعده.
+
+> ⚠️ **قبل M3:** لازم نتكلم في الـ Gemini billing. الـ 20 request/يوم مش كفاية للتطوير نفسه (شوف قسم ملاحظات TASK-003). TASK-006 بتاكل من الـ quota أقل من اللي فاتت (معظم التحقق بيقف عند الـ 400 قبل Gemini) — بس مش صفر.
+
+- **اللي قبلها:** ✅ TASK-006 اتقفلت — Approved في r2 (2026-08-25) مع دين مؤجل بقراره (تحت)
+- **الكوميت:** `0224a54` (الجسم الأساسي) + تعديلات r2 (`using (httpResponse)` + `SystemTextJsonValidationMetadataProvider`)
+- **✅ متحقق عملياً (2026-08-25):** `GET /v1/languages` → 200 + `Cache-Control: public,max-age=3600` · `banana` → 400 بمفتاح `sourceLanguage` · `""` → 400 · `en → en` → **400** · **صفر** استدعاءات Gemini في كل الحالات · build 0 warnings · `dotnet format` نضيف.
+- ~~**⏸️ وقوف:** مفيش TASK-007 لحد ما هو يطلب.~~ — اتقفل، TASK-007 اتعملت واتقفلت.
+
+### 💳 دين معلوم — مؤجل بقرار صريح منه (2026-08-25)
+
+> قال **"مش عايز اعمل التعديلات الباقية"** بعد ما الـ blockers الاتنين اتقفلوا. **دي مش بنود متخطّاة** — دي تأجيل واعي بعد ما اتعرضت عليه بتكلفتها. ماتتحسبش عليه في مفكرة الأنماط.
+
+| # | البند | المكان | التكلفة الحقيقية |
+|---|---|---|---|
+| 1 | مفتاح الخطأ `TargetLanguage` بالـ PascalCase | `TranslationRequest.cs:27` | `nameof` بيدي اسم الـ C#، والـ `SystemTextJsonValidationMetadataProvider` **مبيمسّش** الـ `memberNames` اللي بتتسلّم يدوي في `IValidatableObject`. النتيجة: نفس الـ endpoint بيرجّع `sourceLanguage` camelCase و `TargetLanguage` PascalCase. الحل: نص صريح `["targetLanguage"]` |
+| 2 | typo `"differnt"` | `TranslationRequest.cs:26` | ظاهر في response حقيقي |
+| 3 | تعليق `// 504:` مقصوص | `TranslationsController.cs:54` | داخلي |
+| 4 | `[AttributeUsage(AttributeTargets.Property)]` ناقصة | `SupportedLanguageAttribute.cs` | داخلي |
+| 5 | سطر فاضي زيادة بعد `using (httpResponse) {` | `GeminiApiService.cs:86` | تجميل |
+
+**البند 1 هو الوحيد اللي ليه أثر على الـ contract** — يترجعله مع M4 (توحيد شكل الأخطاء) على أبعد تقدير.
+
+**🔎 اكتشاف تقني يتسجّل:** الـ `SystemTextJsonValidationMetadataProvider` بيصلّح مفاتيح الأخطاء الجاية من `ValidationAttribute` **بس**. الأخطاء الجاية من `IValidatableObject` بتتسلّم مفتاحها يدوي فبتعدّي من غير mapping. وكمان: الـ constructor الفاضي بتاعه **بيحط CamelCase ثابتة جواه**، مش بيقرا `JsonSerializerOptions.PropertyNamingPolicy` — يعني قرار التسمية مكتوب في مكانين مستقلين ومحدش هيحذّرك لو اتفرّقوا.
+
+- 🔴 **بيخلط بين "أملك" و"مستعير" في الـ `IDisposable` — جديدة في TASK-006 r1.** الملاحظة كانت: `HttpResponseMessage` جوه `TranslateAsync` مش بيتعمله dispose. اللي عمله: `GeminiApiService : IDisposable` + `_httpClient.Dispose()`. يعني **عمل dispose لحاجة الـ DI أداهاله، وساب الحاجة اللي هو عملها.**
+  - **الأثر الحقيقي:** `_httpClient.Dispose()` مش بيعمل حاجة أصلاً (الـ factory بتلف الـ handler في `LifetimeTrackingHttpMessageHandler` والـ `Dispose` بتاعه no-op) — فهو مش خطر، هو **صفر**. والـ `HttpResponseMessage` لسه مسايب. وكمان `: IDisposable` بقى ادعاء عام في الـ type مش وراه حاجة.
+  - **القاعدة اللي المفروض تفضل:** dispose اللي **انت** عملته، مش اللي **اتداهولك**.
+  - **الأخطر:** الكود الكامل للحل كان **متبعتله حرفياً** في رسالة "ساعدني" (`using (httpResponse) { ... }`) — يعني المشكلة مش معرفة، دي إنه اشتغل من فهمه للعنوان مش من نص الملاحظة.
+  - مرتبط بنمط "بيحط guard في المكان الغلط" — نفس الشكل: **إجراء صح على هدف غلط**.
+

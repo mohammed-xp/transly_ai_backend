@@ -1,8 +1,8 @@
 # Curriculum — from C# to a deployed backend
 
-The running project is a **thin vertical slice of a backend for a Flutter app he already owns** (a delivery/logistics app is the likely default). Every milestone ships something the Flutter app could actually call.
+The running project is a **thin vertical slice of a real backend for a mobile product** — for TranslyAI, a translation API. Every milestone ships something a mobile client could actually call. The API is client-agnostic: its contract comes from the use case, described in words, never from the Flutter code.
 
-Milestones are a map, not a contract. Skip what he already knows, expand where he struggles, reorder when the project demands it. Adapt task counts to his pace — the numbers below are a guide.
+Milestones are a map, not a contract. Skip what he already knows, expand where he struggles, reorder when the project demands it. Tickets are sized by content, never by his time — the numbers below are a guide. He chooses the direction of each new ticket from the options you offer, and a milestone pulled forward for a reason goes back to this path once the reason is resolved.
 
 Rule of thumb for ordering: **something callable from Postman as early as possible.** Do not spend three weeks on C# syntax before he ever sees a 200 response.
 
@@ -10,7 +10,7 @@ Rule of thumb for ordering: **something callable from Postman as early as possib
 
 ## M0 — Intake & setup
 
-Pick the app, scope the slice, extract the API contract from his Flutter models and Dio calls, agree the stack.
+Pick the product, scope the slice, define the API contract from the use case in words, agree the stack.
 
 Tasks: install the SDK and confirm `dotnet --version`; create the solution and project; commit; get "Hello World" answering on `GET /health` from Postman.
 
@@ -45,7 +45,7 @@ Focus:
 - **DTOs vs domain models** — never return an EF entity to the client. This is a decision block, and his Flutter response-model habit makes it land easily.
 - Correct status codes and `ProblemDetails`.
 
-**Unlocks:** the Flutter app can talk to it with fake in-memory data.
+**Unlocks:** a mobile client can call it, even with fake in-memory data.
 
 ---
 
@@ -53,7 +53,8 @@ Focus:
 
 Focus:
 - `DbContext`, `DbSet<T>`, connection strings, registering the context.
-- Code-first migrations: `dotnet ef migrations add`, `dotnet ef database update`, and reading the generated migration before applying it.
+- Picking the provider package for the target framework. For MySQL on EF Core 10 that is Oracle's `MySql.EntityFrameworkCore`: Pomelo is in every tutorial but stopped at EF Core 9. Check NuGet, not the tutorial.
+- Code-first migrations: `dotnet ef migrations add`, `dotnet ef database update`, reading the generated migration before applying it, and applying it for real — generated operations are provider-agnostic and the provider can still reject them. A wrong migration is fixed in the model and regenerated, never hand-edited.
 - Relationships and navigation properties; `Include` and when it is needed.
 - Change tracking; `AsNoTracking()` on reads.
 - N+1 queries — show him the generated SQL. Nothing teaches this faster than watching the log.
@@ -69,7 +70,7 @@ Focus:
 - DataAnnotations vs FluentValidation — decision block.
 - Global exception handling middleware, `IExceptionHandler`, consistent error contracts.
 - Structured logging with Serilog; log levels; correlation IDs across requests.
-- Making the error shape match what his Flutter `Dio` interceptors and failure-mapping already expect — this is a genuinely nice moment where his client experience pays off.
+- An error contract any mobile client can map to its own failure types without guessing — designed from the API side. This is where his client experience pays off: he has written the `Dio` interceptors that suffer from inconsistent error shapes, so he knows what a good contract must guarantee.
 
 **Unlocks:** an API that fails predictably, which is what makes a client app maintainable.
 
@@ -82,9 +83,9 @@ Focus:
 - ASP.NET Core Identity vs a hand-rolled user table — decision block.
 - `[Authorize]`, roles vs policies.
 - Password hashing; never storing plaintext.
-- Reconciling with Firebase Auth if his app uses it — validating Firebase ID tokens server-side is a legitimate design and he has already built dual-signup logic on the client, so this connects directly.
+- External identity providers (Firebase, Google sign-in) — validating their ID tokens server-side is a legitimate design, but only when the product needs it. Ask about the requirement; do not infer it from client code.
 
-**Unlocks:** a real login the Flutter app can use.
+**Unlocks:** a real login any mobile client can use.
 
 ---
 
@@ -98,7 +99,7 @@ Focus: pagination and filtering (and why `GetAll()` is a future outage), caching
 
 ## M7 — Testing
 
-Focus: xUnit basics and how they differ from Dart's `test`; unit tests for services; mocking with NSubstitute or Moq; integration tests with `WebApplicationFactory`; Testcontainers for a real database in tests; what is worth testing and what is not.
+Focus: xUnit basics and how they differ from Dart's `test`; unit tests for services; mocking with NSubstitute or Moq; integration tests with `WebApplicationFactory`; a real database in tests (Testcontainers, or a schema rebuilt from the migrations on every run) — never the InMemory provider, which has no constraints to test against; asserting on a mechanism rather than an outcome with several causes; breaking the guarded line to watch the test go red; what is worth testing and what is not.
 
 Point out where testing is genuinely easier than in Flutter — no widget tree, no pumping.
 
@@ -108,7 +109,7 @@ Point out where testing is genuinely easier than in Flutter — no widget tree, 
 
 ## M8 — Ship it
 
-Focus: `Dockerfile` for the API, `docker compose` with the database, GitHub Actions CI (build + test on PR) — he already runs Fastlane + Actions for Play Store, so extend that muscle — deploy to Azure App Service or Container Apps, environment configuration and secrets in the cloud, then **point the Flutter app's Dio `baseUrl` at the deployed API and run it on a real device.**
+Focus: `Dockerfile` for the API, `docker compose` with the database, GitHub Actions CI (build + test on PR) — he already runs Fastlane + Actions for Play Store, so extend that muscle. Integration tests that depend on a local database and user secrets need portable configuration first (a CI service container or Testcontainers). Then deploy to Azure App Service or Container Apps, set environment configuration and secrets in the cloud, and **run a real mobile client on a real device against the deployed URL.**
 
 **Unlocks:** the whole reason for the exercise. This is the moment the portfolio piece becomes real, and it is worth a proper retro.
 
@@ -116,4 +117,4 @@ Focus: `Dockerfile` for the API, `docker compose` with the database, GitHub Acti
 
 ## After M8
 
-Options depending on where he wants to go: Azure services in depth (Blob Storage, Service Bus, Key Vault), SignalR for real-time driver tracking, performance profiling and caching strategy, or the React front-end that closes the full-stack loop he is aiming for. Ask him, do not decide for him.
+Options depending on where he wants to go: Azure services in depth (Blob Storage, Service Bus, Key Vault), streaming responses (SSE or SignalR), performance profiling and caching strategy, or the React front-end that closes the full-stack loop he is aiming for. Ask him, do not decide for him.

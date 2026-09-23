@@ -2,6 +2,8 @@
 
 Use this to explain new concepts by anchoring them to what he already owns. An accurate analogy saves twenty minutes of explanation. A sloppy one costs an hour of debugging — so always name where the analogy breaks.
 
+This file bridges language and framework concepts only. It is never a source for the API contract — the API is designed from the use case, not from the Flutter code.
+
 ## Language
 
 | Dart | C# | Where it breaks |

@@ -87,3 +87,24 @@
 ---
 
 > 🔒 **Definition of Submitted** — قبل ما تقول "خلصت": (١) افتح آخر review واعدّ الملاحظات، (٢) افتح الملف ده واعدّ الـ acceptance criteria، (٣) `dotnet format` + `git status`.
+
+
+---
+
+## 📜 السجل (اتنقل من progress.md في 2026-09-23 — النص زي ما هو)
+
+| TASK-004 | `TranslationTone` enum + switch expression + توحيد شكل الخطأ | M2 | ✅ Done | Approved في r2. الشكل العام صح من أول مرة (`_ => throw` مش `_ => ""`، 0 warnings، global converter بـ CamelCase). الـ r1 كانت ثغرة واحدة: `allowIntegerValues` فضل `true` → `"tone": 99` كان بيرجّع 500 + stack trace. اتصلحت واتحققت (99 → 400 ✅، 1 → 400 ✅) |
+
+## ملاحظات من TASK-004 تتبني عليها بعدين
+
+- **الـ `_` arm في switch expression على enum بيبقى unreachable من الـ wire بس لو الـ binder رافض الأرقام.** الاتنين لازم يتظبطوا مع بعض — الـ type لوحده مش ضمانة عند الـ HTTP boundary.
+- **الـ 400 الافتراضي من `[ApiController]` بيحط رسالة الـ `JsonException` كما هي في الـ ModelState** وفيها الـ FQN بتاع النوع الداخلي. مادة جاهزة لدرس M4 عن الـ error contract.
+- في الـ 400 بتاع deserialization فاشل، الـ ModelState بيرجّع كمان `"translation": ["The translation field is required."]` — **اسم الـ parameter في الـ action** بيتسرّب للـ client كأنه اسم حقل. سبب إضافي لـ `IExceptionHandler` مركزي في M4.
+
+- 🟡 **بيحل مشكلة الـ compiler بدل مشكلة التصميم — جديدة في TASK-003.** طلعله `CS8604` فخلّى الـ record `string?` عشان الـ warning يسكت، بدل ما يضمن القيمة. **✅ متكررش في TASK-004** — كتب `_ => throw` مش `_ => ""` رغم إن التانية كانت أسهل وكانت هتسكّت `CS8509`. النمط ده اتحسن، يفضل مراقب من بعيد.
+
+- 🟡 **بيعتمد على الـ default بتاع API من غير ما يفتح الـ signature — جديدة في TASK-004.** كتب `new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)` من غير ما ياخد باله إن فيه parameter تاني `allowIntegerValues` الافتراضي بتاعه `true`. النتيجة: ثغرة 500 + stack trace من مدخل خارجي. **والتاسك كانت طالبة منه صراحة يجرّب `"tone": 1`** وقال إنها هي اللي هتحدد الإجابة — وتخطّاها.
+  - **مرتبط بنمط قديم:** "بيتّبع الـ snippets حرفياً من غير ما يسأل بتعمل ايه". الفرق إن هنا الـ snippet كان من دماغه، فالمشكلة أعمق: **الثقة في الـ default من غير قراية**.
+  - **التدخّل:** كل تاسك من هنا ورايح فيها "سؤال تجاوب عليه بالتجربة" — سؤال واحد لازم يجاوب عليه برد فعلي مش بافتراض. اتحط في TASK-005.
+  - لو اتكرر بعد التدخل ده → تاسك مخصصة: يقرا signature كامل لكل API جديد قبل ما يستعمله.
+
