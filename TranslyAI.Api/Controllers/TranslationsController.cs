@@ -53,8 +53,8 @@ public class TranslationsController(ITranslationService translationService) : Co
                 {
                     SourceText = request.Text,
                     TranslatedText = success.Text,
-                    SourceLanguage = request.SourceLanguage,
-                    TargetLanguage = request.TargetLanguage,
+                    SourceLanguage = LanguageCatalog.Get(request.SourceLanguage),
+                    TargetLanguage = LanguageCatalog.Get( request.TargetLanguage),
                     Model = success.Model,
                     Tone = request.Tone,
                     CreatedAt = success.CreatedAt,

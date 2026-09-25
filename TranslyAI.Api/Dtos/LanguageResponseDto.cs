@@ -4,5 +4,5 @@ namespace TranslyAI.Api.Dtos;
 
 public record LanguageResponseDto
 {
-    public required IReadOnlyList<Language> Languages { get; init; }
+    public required IReadOnlyList<LanguageDto> Languages { get; init; }
 }

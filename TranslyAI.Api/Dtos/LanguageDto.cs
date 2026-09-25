@@ -1,6 +1,6 @@
 namespace TranslyAI.Api.Common;
 
-public record Language
+public record LanguageDto
 {
     public required string Code { get; init; }
     public required string Name { get; init; }
