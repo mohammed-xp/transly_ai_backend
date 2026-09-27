@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Org.BouncyCastle.Asn1.Ocsp;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using TranslyAI.Api.AppSettings;
@@ -14,79 +16,69 @@ namespace TranslyAI.Api.Services;
 public class TranslationService(
     TranslyDbContext dbContext,
     IGeminiApiService geminiApiService,
-    IOptions<QuotaOptions> quotaOptions,
+    IQuotaService quotaService,
     ILogger<TranslationService> logger) : ITranslationService
 {
-    private readonly int _requestsPerDay = quotaOptions.Value.RequestsPerDay;
 
     public async Task<TranslationResult> TranslateAsync(
         TranslationRequestDto request,
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var windowStart = DateTime.UtcNow.Date;
-        var resetsAt = new DateTimeOffset(windowStart.AddDays(1), TimeSpan.Zero);
 
-        var usedCount = await dbContext.TranslationUsages
-            .CountAsync(
-                usage => usage.UserId == userId && usage.CreatedAtUtc >= windowStart,
-                cancellationToken);
+        var reservation = await quotaService.TryReservationAsync(userId, request, cancellationToken);
 
-        if (usedCount >= _requestsPerDay)
+        switch (reservation)
         {
-            logger.LogInformation(
-                "Quota exceeded for {UserId} ({UsedCount}/{Limit}) - Gemini was not called.",
-                userId, usedCount, _requestsPerDay);
+            case QuotaReservation.Granted granted:
+                return await TranslateReservedAsync(request, granted, cancellationToken);
 
-            return new TranslationResult(
-                new TranslationOutcome.QuotaExceeded(),
-                new QuotaSnapshot(_requestsPerDay, usedCount, resetsAt)
-            );
+            case QuotaReservation.Exceeded exceeded:
+                logger.LogInformation(
+                    "Quota exceeded for {UserId} ({Used}/{Limit} characters) - Gemini was not called.",
+                    userId, exceeded.Snapshot.Used, exceeded.Snapshot.Limit);
+                return new TranslationResult(new TranslationOutcome.QuotaExceeded(), exceeded.Snapshot);
+
+            case QuotaReservation.TextTooLong tooLong:
+                return new TranslationResult(new TranslationOutcome.TextTooLong(tooLong.MaxCharacters), tooLong.Snapshot);
+
+            default:
+                throw new UnreachableException($"Unknown reservation type {reservation.GetType().Name}.");
+        }
+    }
+
+    private async Task<TranslationResult> TranslateReservedAsync(
+        TranslationRequestDto request,
+        QuotaReservation.Granted reservation,
+        CancellationToken cancellationToken)
+    {
+        TranslationOutcome outcome;
+        TranslationSource source;
+
+        try
+        {
+            (outcome, source) = await TranslateWithCacheAsync(request, cancellationToken);
+        }
+        catch
+        {
+            await quotaService.ReleaseAsync(reservation.UsageId);
+            throw;
         }
 
-        var outcome = await TranslateWithinQuotaAsync(request, userId, cancellationToken);
-
-        var usedCountConsumed = outcome is TranslationOutcome.Success ? usedCount + 1 : usedCount;
-
-        return new TranslationResult(outcome, new QuotaSnapshot(_requestsPerDay, usedCountConsumed, resetsAt));
-
-    }
-
-    private static string BuildCacheKey(TranslationRequestDto request)
-    {
-        var material = $"{request.SourceLanguage}\n{request.TargetLanguage}\n{request.Tone}\n{request.Text}";
-
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
-    }
-
-    private async Task RecordUsageAsync(
-        TranslationRequestDto request,
-        Guid userId,
-        TranslationSource source,
-        CancellationToken cancellationToken)
-    {
-        dbContext.TranslationUsages.Add(new TranslationUsage
+        if(outcome is not TranslationOutcome.Success)
         {
-            UserId = userId,
-            SourceLanguage = request.SourceLanguage,
-            TargetLanguage = request.TargetLanguage,
-            Tone = request.Tone,
-            CharacterCount = CountCharacters(request.Text),
-            Source = source,
-            CreatedAtUtc = DateTime.UtcNow,
-        });
+            await quotaService.ReleaseAsync(reservation.UsageId);
+            return new TranslationResult(outcome, reservation.Before);
+        }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await quotaService.CommitAsync(reservation.UsageId, source);
+        return new TranslationResult(outcome, reservation.After);
     }
 
-    private static int CountCharacters(string text) => text.EnumerateRunes().Count();
-
-    private async Task<TranslationOutcome> TranslateWithinQuotaAsync(
+    private async Task<(TranslationOutcome outcome, TranslationSource source)> TranslateWithCacheAsync(
         TranslationRequestDto request,
-        Guid userId,
         CancellationToken cancellationToken)
     {
-
         var cacheKey = BuildCacheKey(request);
 
         var model = geminiApiService.ModelName();
@@ -95,61 +87,61 @@ public class TranslationService(
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.CacheKey == cacheKey && t.Model == model, cancellationToken);
 
-        if (cached is not null)
+        if(cached is not null)
         {
-            logger.LogInformation("Cache HIT {CacheKey} - Gemini was not called.", cacheKey);
-
-            await RecordUsageAsync(
-                request,
-                userId,
-                TranslationSource.Cache,
-                cancellationToken
-            );
-
-            return new TranslationOutcome.Success(
-                cached.TranslatedText,
-                cached.Model,
-                new DateTimeOffset(cached.CreatedAtUtc, TimeSpan.Zero)
-            );
+            return (
+                new TranslationOutcome.Success(
+                    cached.TranslatedText,
+                    cached.Model,
+                    new DateTimeOffset(cached.CreatedAtUtc, TimeSpan.Zero)),
+                TranslationSource.Cache);
         }
-
-        logger.LogInformation("Cache MISS {CacheKey} - calling Gemini.", cacheKey);
 
         var outcome = await geminiApiService.TranslateAsync(request, cancellationToken);
 
-        if (outcome is not TranslationOutcome.Success success)
+        if(outcome is TranslationOutcome.Success success)
         {
-            return outcome;
+            await CacheAsync(request, cacheKey, success, cancellationToken);
         }
 
-        await RecordUsageAsync(
-            request,
-            userId,
-            TranslationSource.Gemini,
-            cancellationToken
-        );
+        return (outcome, TranslationSource.Gemini);
+    }
 
-        dbContext.CachedTranslations.Add(new CachedTranslation
+    private async Task CacheAsync(
+        TranslationRequestDto requestDto,
+        string cacheKey,
+        TranslationOutcome.Success success,
+        CancellationToken cancellationToken)
+    {
+        var entry = new CachedTranslation
         {
             CacheKey = cacheKey,
-            SourceLanguage = request.SourceLanguage,
-            TargetLanguage = request.TargetLanguage,
-            Tone = request.Tone,
-            SourceText = request.Text,
+            SourceLanguage = requestDto.SourceLanguage,
+            TargetLanguage = requestDto.TargetLanguage,
+            Tone = requestDto.Tone,
+            SourceText = requestDto.Text,
             TranslatedText = success.Text,
             Model = success.Model,
-            CreatedAtUtc = success.CreatedAt.UtcDateTime
-        });
+            CreatedAtUtc = success.CreatedAt.UtcDateTime,
+        };
+
+        dbContext.CachedTranslations.Add(entry);
 
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex)
+        catch(DbUpdateException ex)
         {
+            dbContext.Entry(entry).State = EntityState.Detached;
             logger.LogWarning(ex, "Could not cache the translation for {CacheKey}.", cacheKey);
         }
+    }
 
-        return success;
+    private static string BuildCacheKey(TranslationRequestDto request)
+    {
+        var material = $"{request.SourceLanguage}\n{request.TargetLanguage}\n{request.Tone}\n{request.Text}";
+
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     }
 }

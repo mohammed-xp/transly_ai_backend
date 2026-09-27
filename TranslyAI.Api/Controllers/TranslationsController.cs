@@ -54,7 +54,7 @@ public class TranslationsController(ITranslationService translationService) : Co
                     SourceText = request.Text,
                     TranslatedText = success.Text,
                     SourceLanguage = LanguageCatalog.Get(request.SourceLanguage),
-                    TargetLanguage = LanguageCatalog.Get( request.TargetLanguage),
+                    TargetLanguage = LanguageCatalog.Get(request.TargetLanguage),
                     Model = success.Model,
                     Tone = request.Tone,
                     CreatedAt = success.CreatedAt,
@@ -63,7 +63,13 @@ public class TranslationsController(ITranslationService translationService) : Co
             // 429: الـ quota الخاصة بالمستخدم خلصت.
             case TranslationOutcome.QuotaExceeded:
                 Response.Headers.RetryAfter = SecondsUntil(result.Quota.ResetsAt);
-                return this.TooManyRequestsProblem("You have used your daily translation quota");
+                return this.TooManyRequestsProblem(
+                    $"Not enough characters left in your quota for this text. Remaining: {result.Quota.Remaining}");
+
+            // 400: النص أطول من المسموح للطلب الواحد في خطة المستخدم.
+            case TranslationOutcome.TextTooLong tooLong:
+                return this.BadRequestProblem(
+                    $"The text exceeds the maximum of {tooLong.MaxCharacters} characters per translation for your plan");
 
             // 503: الـ quota بتاعتنا خلصت.
             case TranslationOutcome.RateLimited rateLimited:

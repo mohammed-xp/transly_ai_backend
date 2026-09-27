@@ -41,6 +41,9 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
             entity.Property(u => u.Source)
                 .HasConversion<string>()
                 .HasMaxLength(20);
+            entity.Property(u => u.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
             entity.Property(u => u.Tone)
                 .HasConversion<string>()
                 .HasMaxLength(16);

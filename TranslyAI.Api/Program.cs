@@ -55,8 +55,8 @@ builder.Services.AddOptions<JwtOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-builder.Services.AddOptions<QuotaOptions>()
-    .Bind(builder.Configuration.GetSection("Quota"))
+builder.Services.AddOptions<PlansOptions>()
+    .Bind(builder.Configuration.GetSection("Plans"))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -77,6 +77,9 @@ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();
+builder.Services.AddScoped<IQuotaService, QuotaService>();
+
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

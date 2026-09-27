@@ -24,6 +24,10 @@ public abstract record TranslationOutcome
 
     public sealed record QuotaExceeded() : TranslationOutcome;
 
+    public sealed record TextTooLong(
+        int MaxCharacters
+    ) : TranslationOutcome;
+
     public sealed record NotCompleted(
         GeminiInteractionStatus Status
     ) : TranslationOutcome;

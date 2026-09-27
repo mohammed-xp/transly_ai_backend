@@ -6,6 +6,12 @@ namespace TranslyAI.Api.Extensions;
 public static class ProblemExtensions
 {
     /// <summary>
+    /// Status 400 Bad Request
+    /// </summary>
+    public static ObjectResult BadRequestProblem(this ControllerBase controller, string detail) =>
+        controller.ProblemWithStatus(StatusCodes.Status400BadRequest, detail);
+
+    /// <summary>
     /// Status 401 Unauthorized
     /// </summary>
     public static ObjectResult UnauthorizedProblem(this ControllerBase controller, string detail) =>

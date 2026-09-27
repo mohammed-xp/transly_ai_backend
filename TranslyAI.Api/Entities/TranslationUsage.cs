@@ -13,6 +13,7 @@ public class TranslationUsage
     public required string TargetLanguage { get; set; }
     public required TranslationTone Tone { get; set; }
     public required int CharacterCount { get; set; }
-    public required TranslationSource Source { get; set; }
+    public required UsageStatus Status { get; set; }
+    public required TranslationSource? Source { get; set; }
     public required DateTime CreatedAtUtc { get; set; }
 }
