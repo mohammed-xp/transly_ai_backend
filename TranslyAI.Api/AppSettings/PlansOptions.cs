@@ -10,5 +10,3 @@ public sealed class PlansOptions
 
     public required Dictionary<string, PlanLimits> Catalog { get; init; }
 }
-
-
