@@ -30,6 +30,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
       
+      - name: Read the project version
+        id: version
+        run: echo "value=$(dotnet msbuild TranslyAI.Api/TranslyAI.Api.csproj -getProperty:Version)" >>"$GITHUB_OUTPUT"
+      
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -45,7 +49,7 @@ jobs:
           --arch x64
           -t:PublishContainer
           -p:ContainerRegistry=ghcr.io
-          -p:ContainerImageTags='"latest;${{ github.sha }}"'
+          -p:ContainerImageTags='"${{ steps.version.outputs.value }};latest;${{ github.sha }}"'
 
   deploy:
     needs: build
