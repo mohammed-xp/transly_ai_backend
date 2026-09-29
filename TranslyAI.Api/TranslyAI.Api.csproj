@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <ContainerRepository>m7mdxp/translyai-api</ContainerRepository>
+    <ContainerRepository>mohammed-xp/translyai-api</ContainerRepository>
   </PropertyGroup>
 
   <ItemGroup>
