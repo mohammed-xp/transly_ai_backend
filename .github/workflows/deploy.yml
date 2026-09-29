@@ -45,7 +45,7 @@ jobs:
           --arch x64
           -t:PublishContainer
           -p:ContainerRegistry=ghcr.io
-          -p:ContainerImageTag='"latest;${{ github.sha }}"'
+          -p:ContainerImageTags='"latest;${{ github.sha }}"'
 
   deploy:
     needs: build
