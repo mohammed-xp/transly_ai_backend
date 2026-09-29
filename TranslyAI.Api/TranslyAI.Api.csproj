@@ -7,6 +7,14 @@
     <UserSecretsId>1afc6d7f-5cb4-4e3e-8082-81a6c2a15c75</UserSecretsId>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <ContainerRepository>m7mdxp/translyai-api</ContainerRepository>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ContainerLabel Include="org.opencontainers.image.source" Value="https://github.com/mohammed-xp/transly_ai_backend" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="16.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
