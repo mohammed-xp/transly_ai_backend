@@ -10,6 +10,7 @@ using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Enums;
 using TranslyAI.Api.Services.IServices;
 
 namespace TranslyAI.Api.Services;
@@ -161,5 +162,38 @@ public class AuthService(
         };
 
         return (_handler.CreateToken(descriptor), new DateTimeOffset(expiresAt, TimeSpan.Zero));
+    }
+
+    public async Task<DeleteAccountResult> DeleteAccountAsync(Guid userId, string password, CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if(user == null)
+        {
+            return DeleteAccountResult.UserNotFound;
+        }
+
+        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
+
+        if(result is PasswordVerificationResult.Failed)
+        {
+            return DeleteAccountResult.InvalidPassword;
+        }
+
+        dbContext.Users.Remove(user);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // طلب تاني مسح نفس الحساب قبلنا بلحظة، فالنتيجة المطلوبة حصلت خلاص.
+            return DeleteAccountResult.Deleted;
+        }
+
+        logger.LogInformation("User {UserId} deleted their account.", userId);
+
+        return DeleteAccountResult.Deleted;
     }
 }

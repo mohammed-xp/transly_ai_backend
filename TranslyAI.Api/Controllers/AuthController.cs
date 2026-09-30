@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TranslyAI.Api.Dtos;
+using TranslyAI.Api.Enums;
 using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services.IServices;
 
@@ -57,6 +58,37 @@ public class AuthController(IAuthService authService) : ControllerBase
 
         return Ok(ApiResponse<LoginResponseDto>.Ok(loginResponse, "User logged in successfully"));
     }
+
+    [Authorize]
+    [HttpDelete("delete-account")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteAccount(
+        [FromBody] DeleteAccountRequestDto request,
+        CancellationToken cancellationToken
+    )
+    {
+       
+        var userId = User.GetUserId();
+
+        if (userId is null)
+        {
+            return this.UnauthorizedProblem("The access token is invalid");
+        }
+
+        var result = await authService.DeleteAccountAsync(userId.Value, request.Password, cancellationToken);
+
+        return result switch
+        {
+            DeleteAccountResult.Deleted => NoContent(),
+            DeleteAccountResult.InvalidPassword => this.BadRequestProblem("Password is incorrect"),
+            DeleteAccountResult.UserNotFound => this.UnauthorizedProblem("The access token is invalid"),
+            _ => this.InternalErrorProblem("Unhandled delete account result")
+        };
+    }
+
 
     [Authorize]
     [HttpGet("me")]

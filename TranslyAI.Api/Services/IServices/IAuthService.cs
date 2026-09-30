@@ -1,5 +1,6 @@
 ﻿using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Services.IServices
 {
@@ -18,5 +19,10 @@ namespace TranslyAI.Api.Services.IServices
         CancellationToken cancellationToken);
 
         Task<UserDto?> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
+
+        Task<DeleteAccountResult> DeleteAccountAsync(
+        Guid userId,
+        string password,
+        CancellationToken cancellationToken);
     }
 }
