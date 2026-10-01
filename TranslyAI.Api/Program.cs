@@ -12,6 +12,7 @@ using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services;
 using TranslyAI.Api.Services.IServices;
 
@@ -149,6 +150,8 @@ builder.Services.AddAuthorization();
 
 
 var app = builder.Build();
+
+await app.ApplyMigrationsAsync();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
