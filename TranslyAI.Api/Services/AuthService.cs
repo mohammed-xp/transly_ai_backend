@@ -151,7 +151,7 @@ public class AuthService(
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateConcurrencyException ex)
+        catch (DbUpdateConcurrencyException)
         {
             // طلب تاني مسح نفس الحساب قبلنا بلحظة، فالنتيجة المطلوبة حصلت خلاص.
             return DeleteAccountResult.Deleted;
