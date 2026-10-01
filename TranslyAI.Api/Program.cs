@@ -75,6 +75,7 @@ builder.Services.AddHttpClient<IGeminiApiService, GeminiApiService>(client =>
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddScoped<IQuotaService, QuotaService>();
 

@@ -1,12 +1,7 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 using MySql.Data.MySqlClient;
-using System.Text;
-using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
@@ -18,7 +13,7 @@ namespace TranslyAI.Api.Services;
 public class AuthService(
     TranslyDbContext dbContext,
     IPasswordHasher<User> passwordHasher,
-    IOptions<JwtOptions> jwtOption,
+    ITokenService tokenService,
     ILogger<AuthService> logger,
     IMapper mapper) : IAuthService
 {
@@ -77,10 +72,9 @@ public class AuthService(
 
         if (result is PasswordVerificationResult.Success)
         {
-            var (token, expiresAt) = CreateAccessToken(user);
             var response = new LoginResponseDto
             {
-                Token = new TokenDto { AccessToken = token, ExpiresAt = expiresAt },
+                Token = await tokenService.IssueAsync(user.Id, cancellationToken),
                 User = mapper.Map<UserDto>(user)
             };
 
@@ -92,10 +86,9 @@ public class AuthService(
             await dbContext.SaveChangesAsync(cancellationToken);
             logger.LogInformation("Password hash upgraded for user {UserId}.", user.Id);
 
-            var (token, expiresAt) = CreateAccessToken(user);
             var response = new LoginResponseDto
             {
-                Token = new TokenDto { AccessToken = token, ExpiresAt = expiresAt },
+                Token = await tokenService.IssueAsync(user.Id, cancellationToken),
                 User = mapper.Map<UserDto>(user)
             };
 
@@ -135,34 +128,6 @@ public class AuthService(
 
     private static bool IsUniqueConstraintViolation(DbUpdateException exception)
         => exception.InnerException is MySqlException { Number: 1062 };
-
-    private (string Token, DateTimeOffset ExpiresAt) CreateAccessToken(User user)
-    {
-        var issuedAt = DateTime.UtcNow;
-        var expiresAt = issuedAt.AddMinutes(jwtOption.Value.AccessTokenMinutes);
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOption.Value.SigningKey));
-        SigningCredentials _signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        JsonWebTokenHandler _handler = new();
-
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Issuer = jwtOption.Value.Issuer,
-            Audience = jwtOption.Value.Audience,
-            IssuedAt = issuedAt,
-            NotBefore = issuedAt,
-            Expires = expiresAt,
-            SigningCredentials = _signingCredentials,
-            Claims = new Dictionary<string, object>
-            {
-                [JwtRegisteredClaimNames.Sub] = user.Id.ToString(),
-                [JwtRegisteredClaimNames.Jti] = Guid.CreateVersion7().ToString()
-            }
-        };
-
-        return (_handler.CreateToken(descriptor), new DateTimeOffset(expiresAt, TimeSpan.Zero));
-    }
 
     public async Task<DeleteAccountResult> DeleteAccountAsync(Guid userId, string password, CancellationToken cancellationToken)
     {

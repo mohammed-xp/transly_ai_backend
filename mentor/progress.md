@@ -5,7 +5,7 @@
 > **حالة بس، مش سجل:** حد أقصى ~150 سطر. تفاصيل كل تاسك (الـ ticket، الـ review rounds، الفخاخ، الأسئلة) في `mentor/tasks/TASK-XXX.md`، والقرارات وقواعد العمل في `mentor/decisions.md`.
 > الملف بيوصف الحالة عند آخر review، مش حالة الريبو — أي بند مفتوح يتأكد من الكود قبل ما يتقال.
 
-**آخر تحديث:** 2026-09-25 (جلسة Explain — نظام الاشتراكات) · **آخر commit اتراجع:** `a226348` (TASK-016)
+**آخر تحديث:** 2026-10-01 («ساعدني» — `TokenService` + refresh tokens) · **آخر commit اتراجع:** `a226348` (TASK-016)
 
 ---
 
@@ -36,12 +36,13 @@
 - **الاتجاه:** 🚧 **M4 — [TASK-018](tasks/TASK-018.md)** اختياره 2026-09-23 من 3 (CI · M4 · refresh tokens؛ الترشيح كان CI). **M8** لسه الاتجاه الأكبر (طلبه 2026-09-02)، ⬜ متقسّمش ومستني إجابتين: **الـ host** · **الـ Gemini tier** (الـ free tier = 20 request/يوم).
 - **التاسك المفتوحة:** [TASK-018](tasks/TASK-018.md) — الجزء (أ) اتكوميت في `680d39b`، وbug الـ `CreatedAt` اتصلح واتكوميت في `57cbda5`. ناقص `format`. ب/ج/د لسه. **قال «مش عايز اكتب تستات خلاص»** — اتعرض عليه 3 اختيارات ومستني رده.
 - **2026-09-25 — Explain: نظام الاشتراكات (مفيش ticket).** اتعرض: core مستقل عن مزوّد الدفع (`Plan` · `Subscription` · عدّاد `UsagePeriod` بـ reserve/refund ذرّي + `TranslationUsages` يفضل ledger) · المزوّد (IAP مباشر / RevenueCat / Stripe) · الـ webhooks (idempotency + «الإشعار تلميح، هات الحالة من المزوّد»). **مستني قراره في:** منصات البيع والأسواق · مزوّد الدفع · وحدة العد (الترشيح: حروف بالـ runes + حد للطلب الواحد). الشرط المسبق: Gemini paid tier (الـ free tier سقفه على الـ key كله).
+- **2026-10-01 — «ساعدني» من غير ticket: `TokenService` + refresh tokens.** اختياراته: rotation + reuse detection (الـ family كلها تتقفل) · access token 15 دقيقة (كان 43200) · `POST auth/refresh` + `POST auth/logout` (من غير `[Authorize]`). الكود كامل اتسلّم في الدردشة وملفاته ماتلمستش. اتجرّب على نسخة في الـ scratchpad: **13/13** (من غير `TranslationsEndpointTests` لأنه مش بيـ compile)، والـ build فيه warning واحد بس وده قديم (`ex` في `DeleteAccountAsync`). الـ break check: لما `IsConcurrencyToken` اتشال، تيست الـ concurrency حمّر 3/3، ولما قفل الـ family اتشال، تيست الـ reuse حمّر. وتيست HTTP متوازي اتجرّب واترفض لأنه مسك الكسر 1/5 بس. **ناقص:** يطبّق الكود ويولّد `AddRefreshTokens` بنفسه، ويجاوب سؤالين التسليم. **الـ migration لازم تتطبق على داتابيز الـ prod قبل النشر**، وإلا الـ login هيرجّع 500. **دين:** مسح الـ tokens اللي خلصت مدتها · `logout-all`.
 - **شغل من غير ticket (2026-09-09 → 2026-09-25) — لسه متراجعش:** `a151f48` · `b31a204` · `025d3c4` · `4ccca52` · `ff7fdd2` · `07b472f` · `1bba3ec` (`LanguageDto`). فيه: envelope `ApiResponse<T>` على الردود · interfaces للـ services · AutoMapper · الـ DTOs اتسمّت `*Dto` · الـ routes بقت `api/v1/...` · تعديل في `AuthEndpointTests`.
   - **#7 و#11 اتقلبوا بقراره 2026-09-23** (`api/v1` · envelope للنجاح وProblemDetails للفشل). #27 اتسحب قبل التنفيذ. **#4** بيتصلح في TASK-018. **#15** (الـ interfaces) لسه مفتوح — الجدول في أول [decisions.md](decisions.md).
   - **اتشاف وقت الضغط (قراية، مش review):** [TranslationsController.cs:57](../TranslyAI.Api/Controllers/TranslationsController.cs#L57) بيعمل `return Ok();` والـ `response` اللي اتبنى فوقه مبيترجعش — الترجمة الناجحة بترجع 200 من غير body.
   - **اتأكد بالتشغيل 2026-09-23 (طلب تاسك، مش review):** الـ test project اتشال من `TranslyAI.slnx` في `025d3c4` → `dotnet test` على الـ solution بيشغّل صفر tests. ولوحده مش بيـ compile (`TranslationRequest` في `GeminiApiServiceTests.cs:40`)، والـ integration tests بتضرب `/v1/...` والـ routes بقت `api/v1/...`. ومفيش تيست بيقرا body الترجمة الناجحة — الـ status بس.
   - **`ex.Message` بيطلع للعميل** في الـ 500 بتاع [AuthController.cs:50](../TranslyAI.Api/Controllers/AuthController.cs#L50).
-- **التيستات عند آخر review:** 11 (TASK-016). النهاردة مش بتـ compile ومش في الـ solution.
+- **التيستات عند آخر review:** 11 (TASK-016). **اتأكد بالتشغيل 2026-10-01:** الـ test project اتشال من `TranslyAI.slnx` تاني في `63cd649`. ولوحده مش بيـ compile بسبب error واحد في `TranslationsEndpointTests.cs:283` (`TranslationUsage.Status` بقى `required`)، وتيستات الترجمة لسه مكتوبة على الـ quota القديمة.
 
 ## التاسكات
 
@@ -82,7 +83,7 @@
 | — | الـ AI proxy | ✅ Interactions API + تصنيف الفشل |
 | M3 | EF Core | ✅ TASK-010/011 |
 | M4 | Validation / errors / logging | 🚧 **TASK-018** (error contract) — Serilog وcorrelation IDs لسه |
-| M5 | Auth | ✅ register · login · `/me` · usage — ⬜ refresh tokens |
+| M5 | Auth | ✅ register · login · `/me` · usage · delete-account — 🔁 refresh tokens اتسلّمت في «ساعدني» 2026-10-01 ولسه متطبقتش |
 | — | العدّاد والاشتراكات | 🚧 الـ quota ✅ (TASK-016) — الخطط والاشتراكات ⬜ |
 | — | Streaming (SSE) | ⬜ |
 | M6 | Production concerns | ⬜ |

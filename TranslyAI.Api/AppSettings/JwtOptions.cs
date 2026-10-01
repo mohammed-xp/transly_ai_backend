@@ -13,6 +13,9 @@ public class JwtOptions
     [MinLength(32, ErrorMessage = "Jwt SigningKey must be at least 32 characters (256 bits) for HS256.")]
     public required string SigningKey { get; init; }
 
-    [Range(1, 43200, ErrorMessage = "Jwt AccessTokenMinutes must be between 1 and 1440.")]
+    [Range(1, 1440, ErrorMessage = "Jwt AccessTokenMinutes must be between 1 and 1440.")]
     public required int AccessTokenMinutes { get; init; }
+
+    [Range(1, 365, ErrorMessage = "Jwt RefreshTokensDays must be between 1 and 1440.")]
+    public required int RefreshTokenDays  { get; init; }
 }

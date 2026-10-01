@@ -9,7 +9,8 @@ namespace TranslyAI.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class AuthController(IAuthService authService) : ControllerBase
+public class AuthController(IAuthService authService,
+ITokenService tokenService) : ControllerBase
 {
 
     [HttpPost("register")]
@@ -70,7 +71,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         CancellationToken cancellationToken
     )
     {
-       
+
         var userId = User.GetUserId();
 
         if (userId is null)
@@ -87,6 +88,38 @@ public class AuthController(IAuthService authService) : ControllerBase
             DeleteAccountResult.UserNotFound => this.UnauthorizedProblem("The access token is invalid"),
             _ => this.InternalErrorProblem("Unhandled delete account result")
         };
+    }
+
+    [HttpPost("refresh")]
+    [ProducesResponseType<ApiResponse<TokenDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ApiResponse<TokenDto>>> Refresh(
+        RefreshTokenRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var token = await tokenService.RefreshAsync(request.RefreshToken, cancellationToken);
+
+        if (token is null)
+        {
+            return this.UnauthorizedProblem("The refresh token is invalid or expired");
+        }
+
+        return Ok(ApiResponse<TokenDto>.Ok(token, "Token refreshed successfully"));
+    }
+
+    [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Logout(
+        RefreshTokenRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await tokenService.RevokeAsync(request.RefreshToken, cancellationToken);
+
+        return NoContent();
     }
 
 

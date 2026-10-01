@@ -13,6 +13,9 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
     public DbSet<TranslationUsage> TranslationUsages =>
         Set<TranslationUsage>();
 
+    public DbSet<RefreshToken> RefreshTokens =>
+        Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CachedTranslation>(entity =>
@@ -51,5 +54,23 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
             entity.HasIndex(usage => usage.UserId);
             entity.HasIndex(usage => new { usage.UserId, usage.CreatedAtUtc });
         });
+    
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+            entity.HasIndex(t => t.FamilyId);
+
+            entity.Property(t => t.RevokedAtUtc).IsConcurrencyToken();
+
+            entity.Property(t => t.CreatedAtUtc).HasColumnType("datetime(6)");
+            entity.Property(t => t.ExpiresAtUtc).HasColumnType("datetime(6)");
+            entity.Property(t => t.RevokedAtUtc).HasColumnType("datetime(6)");
+        });
+    
     }
 }
