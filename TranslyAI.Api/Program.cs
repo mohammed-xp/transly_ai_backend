@@ -70,7 +70,7 @@ builder.Services.AddAutoMapper(option =>
 
 builder.Services.AddHttpClient<IGeminiApiService, GeminiApiService>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(15);
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -151,7 +151,10 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-await app.ApplyMigrationsAsync();
+if (app.Environment.IsDevelopment())
+{
+    await app.ApplyMigrationsAsync();
+}
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();

@@ -10,6 +10,7 @@
 
   <PropertyGroup>
     <ContainerRepository>mohammed-xp/translyai-api</ContainerRepository>
+    <ContainerFamily>noble-chiseled-extra</ContainerFamily>
   </PropertyGroup>
 
   <ItemGroup>
