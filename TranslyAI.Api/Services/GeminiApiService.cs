@@ -6,6 +6,7 @@ using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Dtos.Gemini;
 using TranslyAI.Api.Enums;
 using TranslyAI.Api.Services.IServices;
+using TranslyAI.Api.Services.Result;
 
 namespace TranslyAI.Api.Services;
 

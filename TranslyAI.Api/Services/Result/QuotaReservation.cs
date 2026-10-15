@@ -1,4 +1,4 @@
-﻿namespace TranslyAI.Api.Services
+﻿namespace TranslyAI.Api.Services.Result
 {
     public abstract record QuotaReservation
     {

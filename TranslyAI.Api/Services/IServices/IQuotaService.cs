@@ -1,5 +1,6 @@
 ﻿using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Enums;
+using TranslyAI.Api.Services.Result;
 
 namespace TranslyAI.Api.Services.IServices
 {

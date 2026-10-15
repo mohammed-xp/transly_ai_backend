@@ -9,4 +9,5 @@ public interface ITokenService
     Task<TokenDto?> RefreshAsync(string refreshToken, CancellationToken cancellationToken);
 
     Task RevokeAsync(string refreshToken, CancellationToken cancellationToken);
+    Task RevokeAllAsync(Guid userId, CancellationToken cancellationToken);
 }

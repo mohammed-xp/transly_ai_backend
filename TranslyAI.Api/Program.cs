@@ -60,6 +60,11 @@ builder.Services.AddOptions<PlansOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<GoogleAuthOptions>()
+    .Bind(builder.Configuration.GetSection("Google"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddAutoMapper(option =>
 {
     option.CreateMap<User, UserDto>()
@@ -77,6 +82,7 @@ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddScoped<IQuotaService, QuotaService>();
 

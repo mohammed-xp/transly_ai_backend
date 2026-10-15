@@ -60,6 +60,28 @@ ITokenService tokenService) : ControllerBase
         return Ok(ApiResponse<LoginResponseDto>.Ok(loginResponse, "User logged in successfully"));
     }
 
+    [HttpPost("google")]
+    [ProducesResponseType<ApiResponse<LoginResponseDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ApiResponse<LoginResponseDto>>> LoginWithGoogle(
+        GoogleLoginRequestDto request,
+        CancellationToken cancellationToken
+    )
+    {
+        var loginResponse = await authService.LoginWithGoogleAsync(
+            request.IdToken,
+            cancellationToken);
+
+        if (loginResponse is null)
+        {
+            return this.UnauthorizedProblem("The Google token is invalid");
+        }
+
+        return Ok(ApiResponse<LoginResponseDto>.Ok(loginResponse, "User logged in successfully"));
+    }
+
     [Authorize]
     [HttpDelete("delete-account")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -79,13 +101,14 @@ ITokenService tokenService) : ControllerBase
             return this.UnauthorizedProblem("The access token is invalid");
         }
 
-        var result = await authService.DeleteAccountAsync(userId.Value, request.Password, cancellationToken);
+        var result = await authService.DeleteAccountAsync(userId.Value, request, cancellationToken);
 
         return result switch
         {
             DeleteAccountResult.Deleted => NoContent(),
             DeleteAccountResult.InvalidPassword => this.BadRequestProblem("Password is incorrect"),
             DeleteAccountResult.UserNotFound => this.UnauthorizedProblem("The access token is invalid"),
+            DeleteAccountResult.InvalidGoogleToken => this.BadRequestProblem("The Google token is invalid"),
             _ => this.InternalErrorProblem("Unhandled delete account result")
         };
     }

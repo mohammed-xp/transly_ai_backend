@@ -31,6 +31,8 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
         {
             entity.HasIndex(u => u.Email).IsUnique();
 
+            entity.HasIndex(u => u.GoogleSubject).IsUnique();
+
             entity.Property(u => u.CreatedAtUtc).HasColumnType("datetime(6)");
         });
 

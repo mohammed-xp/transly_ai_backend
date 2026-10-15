@@ -1,4 +1,4 @@
-namespace TranslyAI.Api.Services;
+namespace TranslyAI.Api.Services.Result;
 
 public sealed record QuotaSnapshot(string Plan, int Limit, int Used, DateTimeOffset ResetsAt)
 {

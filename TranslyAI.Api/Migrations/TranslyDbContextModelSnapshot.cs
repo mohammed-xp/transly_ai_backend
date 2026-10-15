@@ -170,8 +170,14 @@ namespace TranslyAI.Api.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("varchar(254)");
 
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("GoogleSubject")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
 
@@ -183,6 +189,9 @@ namespace TranslyAI.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("GoogleSubject")
                         .IsUnique();
 
                     b.ToTable("Users");

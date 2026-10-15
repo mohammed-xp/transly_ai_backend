@@ -18,11 +18,15 @@ namespace TranslyAI.Api.Services.IServices
         LoginRequestDto loginRequest,
         CancellationToken cancellationToken);
 
+        Task<LoginResponseDto?> LoginWithGoogleAsync(
+        string idToken,
+        CancellationToken cancellationToken);
+
         Task<UserDto?> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
 
         Task<DeleteAccountResult> DeleteAccountAsync(
         Guid userId,
-        string password,
+        DeleteAccountRequestDto request,
         CancellationToken cancellationToken);
     }
 }

@@ -7,6 +7,7 @@ using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
 using TranslyAI.Api.Enums;
 using TranslyAI.Api.Services.IServices;
+using TranslyAI.Api.Services.Result;
 
 namespace TranslyAI.Api.Services;
 
@@ -14,6 +15,7 @@ public class AuthService(
     TranslyDbContext dbContext,
     IPasswordHasher<User> passwordHasher,
     ITokenService tokenService,
+    IGoogleTokenValidator googleTokenValidator,
     ILogger<AuthService> logger,
     IMapper mapper) : IAuthService
 {
@@ -34,6 +36,7 @@ public class AuthService(
             Email = normalizedEmail,
             UserName = registerRequest.UserName,
             PasswordHash = string.Empty,
+            EmailVerified = false,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -63,7 +66,7 @@ public class AuthService(
         var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
 
-        if (user is null)
+        if (user is null || user.PasswordHash is null)
         {
             return null;
         }
@@ -106,6 +109,29 @@ public class AuthService(
         }
     }
 
+    public async Task<LoginResponseDto?> LoginWithGoogleAsync(string idToken, CancellationToken cancellationToken)
+    {
+        var google = await googleTokenValidator.ValidateAsync(idToken, cancellationToken);
+
+        if(google is null)
+        {
+            return null;
+        }
+
+        var user = await FindOrCreateGoogleUserAsync(google, cancellationToken);
+
+        if(user is null)
+        {
+            return null;
+        }
+
+        return new LoginResponseDto
+        {
+            Token = await tokenService.IssueAsync(user.Id, cancellationToken),
+            User = mapper.Map<UserDto>(user)
+        };
+    }
+
     public async Task<bool> IsEmailExistsAsync(string email, CancellationToken cancellationToken)
     {
         return await dbContext.Users.AnyAsync(u => u.Email.ToLower() == email.ToLower());
@@ -123,26 +149,33 @@ public class AuthService(
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-    private static string NormalizeEmail(string email)
-        => email.Trim().ToLowerInvariant();
-
-    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
-        => exception.InnerException is MySqlException { Number: 1062 };
-
-    public async Task<DeleteAccountResult> DeleteAccountAsync(Guid userId, string password, CancellationToken cancellationToken)
+    public async Task<DeleteAccountResult> DeleteAccountAsync(Guid userId, DeleteAccountRequestDto request, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
-        if(user == null)
+        if (user == null)
         {
             return DeleteAccountResult.UserNotFound;
         }
 
-        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-
-        if(result is PasswordVerificationResult.Failed)
+        if (!string.IsNullOrEmpty(request.IdToken))
         {
-            return DeleteAccountResult.InvalidPassword;
+            var google = await googleTokenValidator.ValidateAsync(request.IdToken, cancellationToken);
+
+            if(google is null || google.Subject != user.GoogleSubject)
+            {
+                return DeleteAccountResult.InvalidGoogleToken;
+            }
+        }
+        else
+        {
+            if(user.PasswordHash is null
+                || string.IsNullOrEmpty(request.Password)
+                || passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password)
+                    is PasswordVerificationResult.Failed)
+            {
+                return DeleteAccountResult.InvalidPassword;
+            }
         }
 
         dbContext.Users.Remove(user);
@@ -160,5 +193,103 @@ public class AuthService(
         logger.LogInformation("User {UserId} deleted their account.", userId);
 
         return DeleteAccountResult.Deleted;
+    }
+
+    private static string NormalizeEmail(string email)
+        => email.Trim().ToLowerInvariant();
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
+        => exception.InnerException is MySqlException { Number: 1062 };
+
+    private async Task<User?> FindOrCreateGoogleUserAsync(
+        GoogleUserInfo google,
+        CancellationToken cancellationToken)
+    {
+        var email = NormalizeEmail(google.Email);
+
+        for (var attempt=1; ; attempt++)
+        {
+            // الحالة 1: دخل بجوجل قبل كده
+            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.GoogleSubject == google.Subject, cancellationToken);
+
+            if(user is not null)
+            {
+                return user;
+            }
+
+            // الحالة 2: عنده حساب بنفس الإيميل = نربطه بجوجل
+            user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+            if(user is not null)
+            {
+                if(user.GoogleSubject is not null)
+                {
+                    logger.LogWarning(
+                    "Google sign-in refused: user {UserId} is linked to a different Google account.",
+                    user.Id);
+                    return null;
+                }
+
+                var wasVerified = user.EmailVerified;
+
+                user.GoogleSubject = google.Subject;
+
+                if(!wasVerified)
+                {
+                    user.PasswordHash = null;
+                    user.EmailVerified = true;
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                if (!wasVerified)
+                {
+                    await tokenService.RevokeAllAsync(user.Id, cancellationToken);
+                }
+
+                logger.LogInformation(
+                   "User {UserId} linked to Google. Password kept: {PasswordKept}.",
+                   user.Id,
+                   wasVerified);
+
+
+                return user;
+            }
+
+            // الحالة 3: مستخدم جديد = ننشئه
+            user = new User
+            {
+                Email = email,
+                UserName = BuildUserName(google),
+                GoogleSubject = google.Subject,
+                EmailVerified = true,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            dbContext.Users.Add(user);
+
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return user;
+            } catch (DbUpdateException ex) when (attempt == 1 && IsUniqueConstraintViolation(ex))
+            {
+                // طلب تاني سبقنا وعمل نفس الحساب — نعيد المحاولة مرة ونلاقيه
+                dbContext.Entry(user).State = EntityState.Detached;
+            }
+        }
+
+    }
+
+
+    private static string BuildUserName(GoogleUserInfo google)
+    {
+        var name = string.IsNullOrWhiteSpace(google.Name)
+            ? google.Email.Split('@')[0]
+            : google.Name;
+
+        return name.Length <= 50
+            ? name
+            : name[..50];
     }
 }

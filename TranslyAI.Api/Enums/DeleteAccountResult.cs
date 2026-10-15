@@ -4,5 +4,6 @@ public enum DeleteAccountResult
 {
     Deleted,
     UserNotFound,
-    InvalidPassword
+    InvalidPassword,
+    InvalidGoogleToken
 }

@@ -145,4 +145,13 @@ public class TokenService(
 
     private static string Hash(string token)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
+    public Task RevokeAllAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        return dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAtUtc, now), cancellationToken);
+    }
 }
