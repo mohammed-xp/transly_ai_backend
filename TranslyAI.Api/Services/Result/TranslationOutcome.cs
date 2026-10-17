@@ -24,6 +24,10 @@ public abstract record TranslationOutcome
 
     public sealed record QuotaExceeded() : TranslationOutcome;
 
+    public sealed record UnknownTone(
+        string Code
+    ) : TranslationOutcome;
+
     public sealed record TextTooLong(
         int MaxCharacters
     ) : TranslationOutcome;

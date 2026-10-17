@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using TranslyAI.Api.Enums;
 
 namespace TranslyAI.Api.Entities;
 
@@ -13,7 +12,8 @@ public class CachedTranslation
     public required string SourceLanguage { get; set; }
     [MaxLength(8)]
     public required string TargetLanguage { get; set; }
-    public required TranslationTone Tone { get; set; }
+    public required int ToneId { get; set; }
+    public required int PromptVersion { get; set; }
     public required string SourceText { get; set; }
     public required string TranslatedText { get; set; }
     [MaxLength(128)]

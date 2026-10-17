@@ -56,10 +56,14 @@ public class TranslationsController(ITranslationService translationService) : Co
                     SourceLanguage = LanguageCatalog.Get(request.SourceLanguage),
                     TargetLanguage = LanguageCatalog.Get(request.TargetLanguage),
                     Model = success.Model,
-                    Tone = request.Tone,
+                    Tone = result.Tone!.Code,
                     CreatedAt = success.CreatedAt,
                 }, "Translate successfully");
                 return Ok(response);
+
+            case TranslationOutcome.UnknownTone unknownTone:
+                ModelState.AddModelError("tone", $"The tone '{unknownTone.Code}' is not supported.");
+                return ValidationProblem(ModelState);
             // 429: الـ quota الخاصة بالمستخدم خلصت.
             case TranslationOutcome.QuotaExceeded:
                 Response.Headers.RetryAfter = SecondsUntil(result.Quota.ResetsAt);

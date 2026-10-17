@@ -38,6 +38,9 @@ namespace TranslyAI.Api.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("varchar(128)");
 
+                    b.Property<int>("PromptVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("SourceLanguage")
                         .IsRequired()
                         .HasMaxLength(8)
@@ -52,16 +55,16 @@ namespace TranslyAI.Api.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("varchar(8)");
 
-                    b.Property<string>("Tone")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("varchar(16)");
+                    b.Property<int>("ToneId")
+                        .HasColumnType("int");
 
                     b.Property<string>("TranslatedText")
                         .IsRequired()
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ToneId");
 
                     b.HasIndex("CacheKey", "Model")
                         .IsUnique();
@@ -108,6 +111,55 @@ namespace TranslyAI.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("TranslyAI.Api.Entities.Tone", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<bool?>("IsDefault")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsListed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("PromptInstruction")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int>("PromptVersion")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsDefault")
+                        .IsUnique();
+
+                    b.ToTable("Tones");
+                });
+
             modelBuilder.Entity("TranslyAI.Api.Entities.TranslationUsage", b =>
                 {
                     b.Property<long>("Id")
@@ -139,15 +191,15 @@ namespace TranslyAI.Api.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("varchar(8)");
 
-                    b.Property<string>("Tone")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("varchar(16)");
+                    b.Property<int>("ToneId")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("char(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ToneId");
 
                     b.HasIndex("UserId");
 
@@ -197,6 +249,15 @@ namespace TranslyAI.Api.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("TranslyAI.Api.Entities.CachedTranslation", b =>
+                {
+                    b.HasOne("TranslyAI.Api.Entities.Tone", null)
+                        .WithMany()
+                        .HasForeignKey("ToneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TranslyAI.Api.Entities.RefreshToken", b =>
                 {
                     b.HasOne("TranslyAI.Api.Entities.User", null)
@@ -208,6 +269,12 @@ namespace TranslyAI.Api.Migrations
 
             modelBuilder.Entity("TranslyAI.Api.Entities.TranslationUsage", b =>
                 {
+                    b.HasOne("TranslyAI.Api.Entities.Tone", null)
+                        .WithMany()
+                        .HasForeignKey("ToneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TranslyAI.Api.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")

@@ -48,7 +48,7 @@ namespace TranslyAI.Api.Services
             await dbContext.SaveChangesAsync();
         }
 
-        public async Task<QuotaReservation> TryReservationAsync(Guid userId, TranslationRequestDto request, CancellationToken cancellationToken)
+        public async Task<QuotaReservation> TryReservationAsync(Guid userId, TranslationRequestDto request, int toneId, CancellationToken cancellationToken)
         {
             var characters = CountCharacters(request.Text);
             var now = DateTime.UtcNow;
@@ -82,7 +82,7 @@ namespace TranslyAI.Api.Services
                 UserId = userId,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
-                Tone = request.Tone,
+                ToneId = toneId,
                 CharacterCount = characters,
                 Status = UsageStatus.Reserved,
                 Source = null,

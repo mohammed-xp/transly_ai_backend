@@ -30,20 +30,11 @@ public class GeminiApiService : IGeminiApiService
 
     public string ModelName() => _options.Model;
 
-    public async Task<TranslationOutcome> TranslateAsync(TranslationRequestDto translationRequest, CancellationToken cancellationToken)
+    public async Task<TranslationOutcome> TranslateAsync(
+        TranslationRequestDto translationRequest,
+        string toneInstruction,
+        CancellationToken cancellationToken)
     {
-        string toneInstruction = translationRequest.Tone switch
-        {
-            TranslationTone.Formal => "Use a formal, professional register.",
-            TranslationTone.Casual => "Use a relaxed, conversational register.",
-            TranslationTone.Short => "Translate as briefly as possible while preserving meaning.",
-            _ => throw new ArgumentOutOfRangeException(
-                paramName: nameof(translationRequest.Tone),
-                actualValue: translationRequest.Tone,
-                message: "Invalid tone value."
-            ),
-        };
-
         string prompt = $"""
         You are a translation engine. Translate the following text from {translationRequest.SourceLanguage} to {translationRequest.TargetLanguage}.
         {toneInstruction}

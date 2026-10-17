@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -18,6 +17,7 @@ public class TranslationService(
     TranslyDbContext dbContext,
     IGeminiApiService geminiApiService,
     IQuotaService quotaService,
+    IToneService toneService,
     ILogger<TranslationService> logger) : ITranslationService
 {
 
@@ -26,22 +26,29 @@ public class TranslationService(
         Guid userId,
         CancellationToken cancellationToken)
     {
+        var tone = await toneService.ResolveAsync(request.Tone, cancellationToken);
 
-        var reservation = await quotaService.TryReservationAsync(userId, request, cancellationToken);
+        if (tone is null)
+        {
+            var snapshot = await quotaService.GetSnapshotAsync(userId, cancellationToken);
+            return new TranslationResult(new TranslationOutcome.UnknownTone(request.Tone!), snapshot, null);
+        }
+
+        var reservation = await quotaService.TryReservationAsync(userId, request, tone.Id, cancellationToken);
 
         switch (reservation)
         {
             case QuotaReservation.Granted granted:
-                return await TranslateReservedAsync(request, granted, cancellationToken);
+                return await TranslateReservedAsync(request, tone, granted, cancellationToken);
 
             case QuotaReservation.Exceeded exceeded:
                 logger.LogInformation(
                     "Quota exceeded for {UserId} ({Used}/{Limit} characters) - Gemini was not called.",
                     userId, exceeded.Snapshot.Used, exceeded.Snapshot.Limit);
-                return new TranslationResult(new TranslationOutcome.QuotaExceeded(), exceeded.Snapshot);
+                return new TranslationResult(new TranslationOutcome.QuotaExceeded(), exceeded.Snapshot, tone);
 
             case QuotaReservation.TextTooLong tooLong:
-                return new TranslationResult(new TranslationOutcome.TextTooLong(tooLong.MaxCharacters), tooLong.Snapshot);
+                return new TranslationResult(new TranslationOutcome.TextTooLong(tooLong.MaxCharacters), tooLong.Snapshot, tone);
 
             default:
                 throw new UnreachableException($"Unknown reservation type {reservation.GetType().Name}.");
@@ -50,6 +57,7 @@ public class TranslationService(
 
     private async Task<TranslationResult> TranslateReservedAsync(
         TranslationRequestDto request,
+        ResolvedTone tone,
         QuotaReservation.Granted reservation,
         CancellationToken cancellationToken)
     {
@@ -58,7 +66,7 @@ public class TranslationService(
 
         try
         {
-            (outcome, source) = await TranslateWithCacheAsync(request, cancellationToken);
+            (outcome, source) = await TranslateWithCacheAsync(request, tone, cancellationToken);
         }
         catch
         {
@@ -69,18 +77,19 @@ public class TranslationService(
         if(outcome is not TranslationOutcome.Success)
         {
             await quotaService.ReleaseAsync(reservation.UsageId);
-            return new TranslationResult(outcome, reservation.Before);
+            return new TranslationResult(outcome, reservation.Before, tone);
         }
 
         await quotaService.CommitAsync(reservation.UsageId, source);
-        return new TranslationResult(outcome, reservation.After);
+        return new TranslationResult(outcome, reservation.After, tone);
     }
 
     private async Task<(TranslationOutcome outcome, TranslationSource source)> TranslateWithCacheAsync(
         TranslationRequestDto request,
+        ResolvedTone tone,
         CancellationToken cancellationToken)
     {
-        var cacheKey = BuildCacheKey(request);
+        var cacheKey = BuildCacheKey(request, tone);
 
         var model = geminiApiService.ModelName();
 
@@ -98,11 +107,11 @@ public class TranslationService(
                 TranslationSource.Cache);
         }
 
-        var outcome = await geminiApiService.TranslateAsync(request, cancellationToken);
+        var outcome = await geminiApiService.TranslateAsync(request, tone.PromptInstruction, cancellationToken);
 
         if(outcome is TranslationOutcome.Success success)
         {
-            await CacheAsync(request, cacheKey, success, cancellationToken);
+            await CacheAsync(request, tone, cacheKey, success, cancellationToken);
         }
 
         return (outcome, TranslationSource.Gemini);
@@ -110,6 +119,7 @@ public class TranslationService(
 
     private async Task CacheAsync(
         TranslationRequestDto requestDto,
+        ResolvedTone tone,
         string cacheKey,
         TranslationOutcome.Success success,
         CancellationToken cancellationToken)
@@ -119,7 +129,8 @@ public class TranslationService(
             CacheKey = cacheKey,
             SourceLanguage = requestDto.SourceLanguage,
             TargetLanguage = requestDto.TargetLanguage,
-            Tone = requestDto.Tone,
+            ToneId = tone.Id,
+            PromptVersion = tone.PromptVersion,
             SourceText = requestDto.Text,
             TranslatedText = success.Text,
             Model = success.Model,
@@ -139,9 +150,9 @@ public class TranslationService(
         }
     }
 
-    private static string BuildCacheKey(TranslationRequestDto request)
+    private static string BuildCacheKey(TranslationRequestDto request, ResolvedTone tone)
     {
-        var material = $"{request.SourceLanguage}\n{request.TargetLanguage}\n{request.Tone}\n{request.Text}";
+        var material = $"{request.SourceLanguage}\n{request.TargetLanguage}\n{tone.Code}@{tone.PromptVersion}\n{request.Text}";
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     }

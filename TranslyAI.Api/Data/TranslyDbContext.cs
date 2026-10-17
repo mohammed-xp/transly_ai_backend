@@ -16,13 +16,29 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
     public DbSet<RefreshToken> RefreshTokens =>
         Set<RefreshToken>();
 
+    public DbSet<Tone> Tones => Set<Tone>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Tone>(entity =>
+        {
+            entity.Property(t => t.Code).HasMaxLength(32);
+            entity.Property(t => t.Name).HasMaxLength(64);
+            entity.Property(t => t.Description).HasMaxLength(256);
+            entity.Property(t => t.PromptInstruction).HasMaxLength(1000);
+
+            entity.HasIndex(t => t.Code).IsUnique();
+            entity.HasIndex(t => t.IsDefault).IsUnique();
+        });
+
         modelBuilder.Entity<CachedTranslation>(entity =>
         {
             entity.HasIndex(t => new { t.CacheKey, t.Model }).IsUnique();
 
-            entity.Property(t => t.Tone).HasConversion<string>().HasMaxLength(16);
+            entity.HasOne<Tone>()
+                .WithMany()
+                .HasForeignKey(t => t.ToneId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.Property(t => t.CreatedAtUtc).HasColumnType("datetime(6)");
         });
@@ -49,9 +65,10 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
             entity.Property(u => u.Status)
                 .HasConversion<string>()
                 .HasMaxLength(16);
-            entity.Property(u => u.Tone)
-                .HasConversion<string>()
-                .HasMaxLength(16);
+            entity.HasOne<Tone>()
+                .WithMany()
+                .HasForeignKey(u => u.ToneId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(usage => usage.UserId);
             entity.HasIndex(usage => new { usage.UserId, usage.CreatedAtUtc });

@@ -15,6 +15,7 @@ using TranslyAI.Api.Entities;
 using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services;
 using TranslyAI.Api.Services.IServices;
+using TranslyAI.Api.Services.Result;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,9 @@ builder.Services.AddAutoMapper(option =>
     option.CreateMap<User, UserDto>()
         .ForMember(d => d.CreatedAt, o => o.MapFrom(s => new DateTimeOffset(s.CreatedAtUtc, TimeSpan.Zero)))
         .ReverseMap();
+
+    option.CreateMap<Tone, ToneDto>();
+    option.CreateMap<Tone, ResolvedTone>();
 });
 
 
@@ -85,6 +89,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddScoped<IQuotaService, QuotaService>();
+builder.Services.AddScoped<IToneService, ToneService>();
 
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -11,6 +11,7 @@ namespace TranslyAI.Api.Services.IServices
         Task<QuotaReservation> TryReservationAsync(
             Guid userId,
             TranslationRequestDto request,
+            int toneId,
             CancellationToken cancellationToken);
 
         Task CommitAsync(long usageId, TranslationSource source);
