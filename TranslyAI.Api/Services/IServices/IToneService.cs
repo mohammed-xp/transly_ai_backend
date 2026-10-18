@@ -7,5 +7,5 @@ public interface IToneService
 {
     Task<ResolvedTone?> ResolveAsync(string? code, CancellationToken cancellationToken);
 
-    Task<ToneListResponseDto> GetListedAsync(CancellationToken cancellationToken);
+    Task<ToneListResponseDto> GetListedAsync(string culture, CancellationToken cancellationToken);
 }

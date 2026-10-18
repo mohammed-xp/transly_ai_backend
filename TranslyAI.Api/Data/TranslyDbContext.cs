@@ -23,12 +23,25 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
         modelBuilder.Entity<Tone>(entity =>
         {
             entity.Property(t => t.Code).HasMaxLength(32);
-            entity.Property(t => t.Name).HasMaxLength(64);
-            entity.Property(t => t.Description).HasMaxLength(256);
             entity.Property(t => t.PromptInstruction).HasMaxLength(1000);
 
             entity.HasIndex(t => t.Code).IsUnique();
             entity.HasIndex(t => t.IsDefault).IsUnique();
+
+            entity.HasMany(t => t.Translations)
+                .WithOne()
+                .HasForeignKey(x => x.ToneId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ToneTranslation>(entity =>
+        {
+            entity.ToTable("ToneTranslations");
+            entity.HasKey(x => new { x.ToneId, x.Culture });
+
+            entity.Property(x => x.Culture).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(64);
+            entity.Property(x => x.Description).HasMaxLength(256);
         });
 
         modelBuilder.Entity<CachedTranslation>(entity =>

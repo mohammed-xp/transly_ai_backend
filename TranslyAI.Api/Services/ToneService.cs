@@ -1,6 +1,7 @@
 using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
+using TranslyAI.Api.Common;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Services.IServices;
@@ -29,12 +30,13 @@ public class ToneService(TranslyDbContext dbContext, IMapper mapper) : IToneServ
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<ToneListResponseDto> GetListedAsync(CancellationToken cancellationToken)
+    public async Task<ToneListResponseDto> GetListedAsync(string culture, CancellationToken cancellationToken)
     {
         var tones = await dbContext.Tones
+            .AsNoTracking()
             .Where(t => t.IsListed)
             .OrderBy(t => t.SortOrder)
-            .ProjectTo<ToneDto>(mapper.ConfigurationProvider)
+            .Include(t => t.Translations.Where(x => x.Culture == culture || x.Culture == AppCultures.Default))
             .ToListAsync(cancellationToken);
 
         var defaultTone = await dbContext.Tones
@@ -46,7 +48,18 @@ public class ToneService(TranslyDbContext dbContext, IMapper mapper) : IToneServ
         return new ToneListResponseDto
         {
             DefaultTone = defaultTone,
-            Tones = tones,
+            Tones = tones.Select(tone =>
+            {
+                var translation = tone.Translations.FirstOrDefault(x => x.Culture == culture)
+                    ?? tone.Translations.Single(x => x.Culture == AppCultures.Default);
+
+                return new ToneDto
+                {
+                    Code = tone.Code,
+                    Name = translation.Name,
+                    Description = translation.Description,
+                };
+            }).ToList(),
         };
     }
 }

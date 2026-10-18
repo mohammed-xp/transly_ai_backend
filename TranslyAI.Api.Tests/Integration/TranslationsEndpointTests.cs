@@ -203,6 +203,29 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
             Header(response, "X-RateLimit-Remaining"));
     }
 
+    // ── 7. كود الـ tone ما يتأثر بلغة الطلب ──────────────────
+
+    [Fact]
+    public async Task Translate_WithArabicAcceptLanguage_StillAcceptsTheToneCode()
+    {
+        factory.Gemini.RespondWith = () => GeminiCompleted("مرحبا");
+
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginViaApiAsync(client, "arabic-ui@transly.test");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/translations")
+        {
+            Content = JsonContent.Create(AnyTranslation()),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.AcceptLanguage.Add(new StringWithQualityHeaderValue("ar"));
+
+        var response = await client.SendAsync(request);
+
+        var translation = await ApiResponseAssert.SuccessAsync<TranslationResponseDto>(response);
+        Assert.Equal("casual", translation.Tone);
+    }
+
 
     // ── الأدوات ──────────────────────────────────────────────
 

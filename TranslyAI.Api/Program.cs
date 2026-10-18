@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TranslyAI.Api.AppSettings;
+using TranslyAI.Api.Common;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
@@ -72,8 +74,15 @@ builder.Services.AddAutoMapper(option =>
         .ForMember(d => d.CreatedAt, o => o.MapFrom(s => new DateTimeOffset(s.CreatedAtUtc, TimeSpan.Zero)))
         .ReverseMap();
 
-    option.CreateMap<Tone, ToneDto>();
     option.CreateMap<Tone, ResolvedTone>();
+});
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.SetDefaultCulture(AppCultures.Default);
+    options.AddSupportedUICultures(AppCultures.Supported);
+    options.ApplyCurrentCultureToResponseHeaders = true;
+    options.RequestCultureProviders = [new AcceptLanguageHeaderRequestCultureProvider()];
 });
 
 
@@ -169,6 +178,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+app.UseRequestLocalization();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
