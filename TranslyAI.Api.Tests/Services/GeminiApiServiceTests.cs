@@ -8,6 +8,7 @@ using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Enums;
 using TranslyAI.Api.Services;
+using TranslyAI.Api.Services.Result;
 using TranslyAI.Api.Tests.Fakes;
 
 namespace TranslyAI.Api.Tests.Services;
@@ -15,6 +16,8 @@ namespace TranslyAI.Api.Tests.Services;
 public class GeminiApiServiceTests
 {
     // ── الأدوات ──────────────────────────────────────────────
+
+    private const string AnyToneInstruction = "Use a neutral tone.";
 
     private readonly FakeLogger<GeminiApiService> _logger = new();
 
@@ -66,7 +69,7 @@ public class GeminiApiServiceTests
 
         var service = CreateService(Respond(HttpStatusCode.OK, body));
 
-        var outcome = await service.TranslateAsync(AnyRequest(), CancellationToken.None);
+        var outcome = await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
 
         var success = Assert.IsType<TranslationOutcome.Success>(outcome);
         Assert.Equal("مرحبا", success.Text);
@@ -97,7 +100,7 @@ public class GeminiApiServiceTests
 
         var service = CreateService(Respond(HttpStatusCode.OK, body));
 
-        var outcome = await service.TranslateAsync(AnyRequest(), CancellationToken.None);
+        var outcome = await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
 
         var success = Assert.IsType<TranslationOutcome.Success>(outcome);
         Assert.Equal("مرحبا", success.Text);
@@ -114,7 +117,7 @@ public class GeminiApiServiceTests
 
         var service = CreateService(response);
 
-        var outcome = await service.TranslateAsync(AnyRequest(), CancellationToken.None);
+        var outcome = await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
 
         var rateLimited = Assert.IsType<TranslationOutcome.RateLimited>(outcome);
         Assert.Equal(TimeSpan.FromSeconds(30), rateLimited.RetryAfter);
@@ -130,7 +133,7 @@ public class GeminiApiServiceTests
 
         var service = CreateService(Respond(HttpStatusCode.OK, body));
 
-        var outcome = await service.TranslateAsync(AnyRequest(), CancellationToken.None);
+        var outcome = await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
 
         Assert.IsType<TranslationOutcome.UpstreamError>(outcome);
     }
@@ -142,7 +145,7 @@ public class GeminiApiServiceTests
         var service = CreateService(
             Respond(HttpStatusCode.OK, "<html>502 Bad Gateway</html>", mediaType: "text/html"));
 
-        var outcome = await service.TranslateAsync(AnyRequest(), CancellationToken.None);
+        var outcome = await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
 
         Assert.IsType<TranslationOutcome.UpstreamError>(outcome);
     }
@@ -162,7 +165,7 @@ public class GeminiApiServiceTests
 
         var service = CreateService(Respond(HttpStatusCode.OK, body));
 
-        var outcome = await service.TranslateAsync(AnyRequest(), CancellationToken.None);
+        var outcome = await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
 
         // الـ assert الأساسي: التحذير اتنفّذ فعلاً
         var warning = Assert.Single(

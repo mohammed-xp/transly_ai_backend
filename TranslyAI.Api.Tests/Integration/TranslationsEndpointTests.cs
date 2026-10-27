@@ -301,6 +301,11 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
             .Select(user => user.Id)
             .SingleAsync();
 
+        var toneId = await db.Tones
+            .Where(tone => tone.Code == "casual")
+            .Select(tone => tone.Id)
+            .SingleAsync();
+
         for (var i = 0; i < rows; i++)
         {
             db.TranslationUsages.Add(new TranslationUsage
@@ -308,8 +313,9 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
                 UserId = userId,
                 SourceLanguage = "en",
                 TargetLanguage = "ar",
-                Tone = TranslationTone.Casual,
+                ToneId = toneId,
                 CharacterCount = 11,
+                Status = UsageStatus.Committed,
                 Source = TranslationSource.Gemini,
                 CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
             });
