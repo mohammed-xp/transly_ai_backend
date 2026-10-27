@@ -13,5 +13,11 @@ namespace TranslyAI.Api.AppSettings
 
         [Range(1, 50_000, ErrorMessage = "MaxCharactersPerRequest must be between {1} and {2}.")]
         public required int MaxCharactersPerRequest { get; init; }
+
+        [Range(0, 1_000_000, ErrorMessage = "AudioSecondsPerWindow must be between {1} and {2}.")]
+        public required int AudioSecondsPerWindow { get; init; }
+
+        [Range(0, 120, ErrorMessage = "MaxAudioSecondsPerRequest must be between {1} and {2}.")]
+        public required int MaxAudioSecondsPerRequest { get; init; }
     }
 }

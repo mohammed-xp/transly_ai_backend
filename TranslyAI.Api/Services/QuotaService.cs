@@ -54,7 +54,7 @@ namespace TranslyAI.Api.Services
             var now = DateTime.UtcNow;
             QuotaPeriod period = CurrentPeriod(now);
 
-            if(characters > period.Limits.MaxCharactersPerRequest)
+            if (characters > period.Limits.MaxCharactersPerRequest)
             {
                 var usedSoFar = await SumUsedAsync(userId, period.StartUtc, now, cancellationToken);
 
@@ -72,7 +72,7 @@ namespace TranslyAI.Api.Services
 
             var used = await SumUsedAsync(userId, period.StartUtc, now, cancellationToken);
 
-            if(used+characters > period.Limits.CharactersPerWindow)
+            if (used + characters > period.Limits.CharactersPerWindow)
             {
                 return new QuotaReservation.Exceeded(period.Snapshot(used));
             }

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -61,6 +62,15 @@ builder.Services.AddOptions<JwtOptions>()
 builder.Services.AddOptions<PlansOptions>()
     .Bind(builder.Configuration.GetSection("Plans"))
     .ValidateDataAnnotations()
+    .Validate(
+        plans => plans.Catalog is not null && plans.Catalog.ContainsKey(plans.DefaultPlan),
+        "Plans:DefaultPlan must match a plan in Plans:Catalog."
+    )
+    .Validate(
+        plans => plans.Catalog is not null && plans.Catalog.Values.All(limits =>
+            Validator.TryValidateObject(limits, new ValidationContext(limits), null, validateAllProperties: true)),
+        "Every plan in Plans:Catalog must have valid limits (check the [Range] rules in PlanLimits)."
+    )
     .ValidateOnStart();
 
 builder.Services.AddOptions<GoogleAuthOptions>()

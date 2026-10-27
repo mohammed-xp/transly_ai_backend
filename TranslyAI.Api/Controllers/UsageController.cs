@@ -19,7 +19,7 @@ namespace TranslyAI.Api.Controllers
         {
             var userId = User.GetUserId();
 
-            if(userId is null)
+            if (userId is null)
             {
                 return this.UnauthorizedProblem("The access token is invalid");
             }

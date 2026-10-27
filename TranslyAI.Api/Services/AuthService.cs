@@ -113,14 +113,14 @@ public class AuthService(
     {
         var google = await googleTokenValidator.ValidateAsync(idToken, cancellationToken);
 
-        if(google is null)
+        if (google is null)
         {
             return null;
         }
 
         var user = await FindOrCreateGoogleUserAsync(google, cancellationToken);
 
-        if(user is null)
+        if (user is null)
         {
             return null;
         }
@@ -162,14 +162,14 @@ public class AuthService(
         {
             var google = await googleTokenValidator.ValidateAsync(request.IdToken, cancellationToken);
 
-            if(google is null || google.Subject != user.GoogleSubject)
+            if (google is null || google.Subject != user.GoogleSubject)
             {
                 return DeleteAccountResult.InvalidGoogleToken;
             }
         }
         else
         {
-            if(user.PasswordHash is null
+            if (user.PasswordHash is null
                 || string.IsNullOrEmpty(request.Password)
                 || passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password)
                     is PasswordVerificationResult.Failed)
@@ -207,12 +207,12 @@ public class AuthService(
     {
         var email = NormalizeEmail(google.Email);
 
-        for (var attempt=1; ; attempt++)
+        for (var attempt = 1; ; attempt++)
         {
             // الحالة 1: دخل بجوجل قبل كده
             var user = await dbContext.Users.FirstOrDefaultAsync(u => u.GoogleSubject == google.Subject, cancellationToken);
 
-            if(user is not null)
+            if (user is not null)
             {
                 return user;
             }
@@ -220,9 +220,9 @@ public class AuthService(
             // الحالة 2: عنده حساب بنفس الإيميل = نربطه بجوجل
             user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-            if(user is not null)
+            if (user is not null)
             {
-                if(user.GoogleSubject is not null)
+                if (user.GoogleSubject is not null)
                 {
                     logger.LogWarning(
                     "Google sign-in refused: user {UserId} is linked to a different Google account.",
@@ -234,7 +234,7 @@ public class AuthService(
 
                 user.GoogleSubject = google.Subject;
 
-                if(!wasVerified)
+                if (!wasVerified)
                 {
                     user.PasswordHash = null;
                     user.EmailVerified = true;
@@ -272,7 +272,8 @@ public class AuthService(
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
                 return user;
-            } catch (DbUpdateException ex) when (attempt == 1 && IsUniqueConstraintViolation(ex))
+            }
+            catch (DbUpdateException ex) when (attempt == 1 && IsUniqueConstraintViolation(ex))
             {
                 // طلب تاني سبقنا وعمل نفس الحساب — نعيد المحاولة مرة ونلاقيه
                 dbContext.Entry(user).State = EntityState.Detached;

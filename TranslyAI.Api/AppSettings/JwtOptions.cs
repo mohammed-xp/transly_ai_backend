@@ -17,5 +17,5 @@ public class JwtOptions
     public required int AccessTokenMinutes { get; init; }
 
     [Range(1, 365, ErrorMessage = "Jwt RefreshTokensDays must be between 1 and 1440.")]
-    public required int RefreshTokenDays  { get; init; }
+    public required int RefreshTokenDays { get; init; }
 }

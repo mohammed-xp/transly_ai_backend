@@ -9,4 +9,7 @@ public class GeminiOptions
 
     [Required(ErrorMessage = "Gemini Model is required.")]
     public required string Model { get; init; }
+
+    // اختياري: لو مش موجود بنستخدم Model
+    public string? ConversationModel { get; init; }
 }

@@ -11,7 +11,7 @@ namespace TranslyAI.Api.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("UPDATE TranslationUsages SET Status = 'Committed' WHERE Status = '';");
-        
+
         }
 
         /// <inheritdoc />

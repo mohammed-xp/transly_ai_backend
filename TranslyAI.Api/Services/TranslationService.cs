@@ -74,7 +74,7 @@ public class TranslationService(
             throw;
         }
 
-        if(outcome is not TranslationOutcome.Success)
+        if (outcome is not TranslationOutcome.Success)
         {
             await quotaService.ReleaseAsync(reservation.UsageId);
             return new TranslationResult(outcome, reservation.Before, tone);
@@ -97,7 +97,7 @@ public class TranslationService(
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.CacheKey == cacheKey && t.Model == model, cancellationToken);
 
-        if(cached is not null)
+        if (cached is not null)
         {
             return (
                 new TranslationOutcome.Success(
@@ -109,7 +109,7 @@ public class TranslationService(
 
         var outcome = await geminiApiService.TranslateAsync(request, tone.PromptInstruction, cancellationToken);
 
-        if(outcome is TranslationOutcome.Success success)
+        if (outcome is TranslationOutcome.Success success)
         {
             await CacheAsync(request, tone, cacheKey, success, cancellationToken);
         }
@@ -143,7 +143,7 @@ public class TranslationService(
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch(DbUpdateException ex)
+        catch (DbUpdateException ex)
         {
             dbContext.Entry(entry).State = EntityState.Detached;
             logger.LogWarning(ex, "Could not cache the translation for {CacheKey}.", cacheKey);

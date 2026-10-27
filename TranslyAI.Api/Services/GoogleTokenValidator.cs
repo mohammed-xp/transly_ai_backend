@@ -30,7 +30,7 @@ namespace TranslyAI.Api.Services
                 return null;
             }
 
-            if(!payload.EmailVerified || string.IsNullOrWhiteSpace(payload.Email))
+            if (!payload.EmailVerified || string.IsNullOrWhiteSpace(payload.Email))
             {
                 logger.LogInformation("Google ID token rejected: Email not verified or missing");
                 return null;
