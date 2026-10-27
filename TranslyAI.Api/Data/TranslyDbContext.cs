@@ -18,6 +18,8 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
 
     public DbSet<Tone> Tones => Set<Tone>();
 
+    public DbSet<ConversationUsage> ConversationUsages => Set<ConversationUsage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Tone>(entity =>
@@ -104,5 +106,18 @@ public class TranslyDbContext(DbContextOptions<TranslyDbContext> options) : DbCo
             entity.Property(t => t.RevokedAtUtc).HasColumnType("datetime(6)");
         });
 
+        modelBuilder.Entity<ConversationUsage>(entity =>
+            {
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(u => u.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(u => u.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(16);
+                
+                entity.HasIndex(u => new {u.UserId, u.CreatedAtUtc});
+            });
     }
 }

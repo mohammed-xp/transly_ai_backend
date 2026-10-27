@@ -72,6 +72,43 @@ namespace TranslyAI.Api.Migrations
                     b.ToTable("CachedTranslations");
                 });
 
+            modelBuilder.Entity("TranslyAI.Api.Entities.ConversationUsage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("AudioSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LanguageA")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("varchar(8)");
+
+                    b.Property<string>("LanguageB")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("varchar(8)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.ToTable("ConversationUsages");
+                });
+
             modelBuilder.Entity("TranslyAI.Api.Entities.RefreshToken", b =>
                 {
                     b.Property<long>("Id")
@@ -269,6 +306,15 @@ namespace TranslyAI.Api.Migrations
                         .WithMany()
                         .HasForeignKey("ToneId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TranslyAI.Api.Entities.ConversationUsage", b =>
+                {
+                    b.HasOne("TranslyAI.Api.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
