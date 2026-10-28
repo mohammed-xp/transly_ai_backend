@@ -65,10 +65,7 @@ namespace TranslyAI.Api.Services
                 IsolationLevel.ReadCommitted,
                 cancellationToken);
 
-            await dbContext.Users
-                .FromSql($"SELECT * FROM Users WHERE Id = {userId} FOR UPDATE")
-                .AsNoTracking()
-                .ToListAsync(cancellationToken);
+            await LockUserRowAsync(userId, cancellationToken);
 
             var used = await SumUsedAsync(userId, period.StartUtc, now, cancellationToken);
 
@@ -94,6 +91,84 @@ namespace TranslyAI.Api.Services
             await transaction.CommitAsync(cancellationToken);
 
             return new QuotaReservation.Granted(usage.Id, period.Snapshot(used), period.Snapshot(used + characters));
+        }
+
+        public async Task<QuotaSnapshot> GetAudioSnapshotAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            var now = DateTime.UtcNow;
+            var period = CurrentPeriod(now);
+            var used = await SumAudioSecondsUsedAsync(userId, period.StartUtc, now, cancellationToken);
+
+            return period.AudioSnapshot(used);
+        }
+
+        public async Task<AudioQuotaReservation> TryReserveAudioAsync(Guid userId, string languageA, string languageB, int audioSeconds, CancellationToken cancellationToken)
+        {
+            var now = DateTime.UtcNow;
+            var period = CurrentPeriod(now);
+
+            // فحص الطول الأول — من غير transaction ولا lock
+            if (audioSeconds > period.Limits.MaxAudioSecondsPerRequest)
+            {
+                var usedSoFar = await SumAudioSecondsUsedAsync(userId, period.StartUtc, now, cancellationToken);
+
+                return new AudioQuotaReservation.AudioTooLong(
+                    period.Limits.MaxAudioSecondsPerRequest,
+                    period.AudioSnapshot(usedSoFar));
+            }
+
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+
+            await LockUserRowAsync(userId, cancellationToken);
+
+            var used = await SumAudioSecondsUsedAsync(userId, period.StartUtc, now, cancellationToken);
+
+            if (used + audioSeconds > period.Limits.AudioSecondsPerWindow)
+            {
+                // الـ transaction بتعمل rollback لوحدها مع الـ dispose
+                return new AudioQuotaReservation.Exceeded(period.AudioSnapshot(used));
+            }
+
+            var usage = new ConversationUsage
+            {
+                UserId = userId,
+                LanguageA = languageA,
+                LanguageB = languageB,
+                AudioSeconds = audioSeconds,
+                Status = UsageStatus.Reserved,
+                CreatedAtUtc = now
+            };
+
+            dbContext.ConversationUsages.Add(usage);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return new AudioQuotaReservation.Granted(
+                usage.Id,
+                period.AudioSnapshot(used),
+                period.AudioSnapshot(used + audioSeconds));
+        }
+
+        public async Task CommitAudioAsync(long usageId)
+        {
+            var usage = await dbContext.ConversationUsages.FindAsync(usageId)
+                ?? throw new InvalidOperationException($"Conversation usage {usageId} was not found.");
+            
+            usage.Status = UsageStatus.Committed;
+            await dbContext.SaveChangesAsync();
+        }
+
+        public async Task ReleaseAudioAsync(long usageId)
+        {
+            var usage = await dbContext.ConversationUsages.FindAsync(usageId);
+            
+            if (usage is null) return;
+
+            dbContext.ConversationUsages.Remove(usage);
+
+            await dbContext.SaveChangesAsync();
         }
 
         private Task<int> SumUsedAsync(Guid userId, DateTime windowStartUtc, DateTime now, CancellationToken cancellationToken)
@@ -123,7 +198,28 @@ namespace TranslyAI.Api.Services
         private sealed record QuotaPeriod(string Plan, PlanLimits Limits, DateTime StartUtc, DateTimeOffset ResetsAt)
         {
             public QuotaSnapshot Snapshot(int used) => new(Plan, Limits.CharactersPerWindow, used, ResetsAt);
+            
+            public QuotaSnapshot AudioSnapshot(int usedSeconds) => new(Plan, Limits.AudioSecondsPerWindow, usedSeconds, ResetsAt);
         }
 
+
+        private Task<int> SumAudioSecondsUsedAsync(Guid userId, DateTime windowStartUtc, DateTime now, CancellationToken cancellationToken)
+        {
+            var reservationCutoff = now - ReservationTimeout;
+            
+            return dbContext.ConversationUsages
+                .Where(u => u.UserId == userId
+                    && u.CreatedAtUtc >= windowStartUtc
+                    && (u.Status == UsageStatus.Committed || u.CreatedAtUtc >= reservationCutoff))
+                .SumAsync(u => u.AudioSeconds, cancellationToken);
+        }
+
+        // بيقفل صف المستخدم لحد آخر الـ transaction —
+        // أي reservation تانية لنفس المستخدم (نص أو صوت) بتستنى لحد ما دي تخلص
+        private Task LockUserRowAsync(Guid userId, CancellationToken cancellationToken) =>
+            dbContext.Users
+                .FromSql($"SELECT * FROM Users WHERE Id = {userId} FOR UPDATE")
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
     }
 }

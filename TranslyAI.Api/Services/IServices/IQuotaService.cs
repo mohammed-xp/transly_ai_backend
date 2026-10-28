@@ -17,5 +17,20 @@ namespace TranslyAI.Api.Services.IServices
         Task CommitAsync(long usageId, TranslationSource source);
 
         Task ReleaseAsync(long UsageId);
+
+        // ── Conversation (audio seconds) ──────────────────────
+
+        Task<QuotaSnapshot> GetAudioSnapshotAsync(Guid userId, CancellationToken cancellationToken);
+
+        Task<AudioQuotaReservation> TryReserveAudioAsync(
+            Guid userId,
+            string languageA,
+            string languageB,
+            int audioSeconds,
+            CancellationToken cancellationToken);
+
+        Task CommitAudioAsync(long usageId);
+
+        Task ReleaseAudioAsync(long usageId);
     }
 }
