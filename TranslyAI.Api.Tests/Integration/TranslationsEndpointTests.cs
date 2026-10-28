@@ -1,9 +1,12 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
@@ -15,6 +18,7 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
     : IClassFixture<TranslyApiFactory>, IAsyncLifetime
 {
     private const string Password = "Passw0rd!123";
+    private const string AnyText = "Hello world";
 
     // ── تنضيف قبل كل تيست ────────────────────────────────────
 
@@ -119,7 +123,6 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
         Assert.Equal(0, await db.TranslationUsages.CountAsync());
         Assert.Equal(0, await db.CachedTranslations.CountAsync());
     }
-
     // ── 4. عدّى حدّه = 429، وGemini مبيتنداش ────────────────────
 
     [Fact]
@@ -129,23 +132,25 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
 
         var client = factory.CreateClient();
         const string email = "quota@transly.test";
+        var limits = CharacterLimits();
 
         var token = await RegisterAndLoginViaApiAsync(client, email);
-        await SeedUsageAsync(email, TranslyApiFactory.RequestsPerDay);
+        await SeedUsedCharactersAsync(email, limits.CharactersPerWindow);
 
         var response = await TranslateAsync(client, token);
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
         Assert.Equal(0, factory.Gemini.CallCount);
 
-        Assert.Equal(TranslyApiFactory.RequestsPerDay.ToString(), Header(response, "X-RateLimit-Limit"));
+        Assert.Equal(Invariant(limits.CharactersPerWindow), Header(response, "X-RateLimit-Limit"));
         Assert.Equal("0", Header(response, "X-RateLimit-Remaining"));
         Assert.InRange(response.Headers.RetryAfter!.Delta!.Value, TimeSpan.Zero, TimeSpan.FromDays(1));
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
 
-        Assert.Equal(TranslyApiFactory.RequestsPerDay, await db.TranslationUsages.CountAsync());
+        // الصف اللي زرعناه بس — الطلب المرفوض ما سابش reservation
+        Assert.Equal(1, await db.TranslationUsages.CountAsync());
         Assert.Equal(0, await db.CachedTranslations.CountAsync());
     }
 
@@ -158,6 +163,7 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
 
         var client = factory.CreateClient();
         const string email = "cached-quota@transly.test";
+        var limits = CharacterLimits();
 
         var token = await RegisterAndLoginViaApiAsync(client, email);
 
@@ -165,10 +171,11 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(
-            (TranslyApiFactory.RequestsPerDay - 1).ToString(),
+            Invariant(limits.CharactersPerWindow - AnyText.Length),
             Header(first, "X-RateLimit-Remaining"));
 
-        await SeedUsageAsync(email, TranslyApiFactory.RequestsPerDay - 1);
+        // نملى الباقي كله — نفس النص (اللي بقى في الكاش) لازم يترفض
+        await SeedUsedCharactersAsync(email, limits.CharactersPerWindow - AnyText.Length);
 
         var second = await TranslateAsync(client, token);
 
@@ -179,7 +186,7 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
         var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
 
         Assert.Equal(1, await db.CachedTranslations.CountAsync());
-        Assert.Equal(TranslyApiFactory.RequestsPerDay, await db.TranslationUsages.CountAsync());
+        Assert.Equal(2, await db.TranslationUsages.CountAsync());
     }
 
     // ── 6. استهلاك امبارح مبيتحسبش النهاردة ────────────────────
@@ -191,15 +198,16 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
 
         var client = factory.CreateClient();
         const string email = "yesterday@transly.test";
+        var limits = CharacterLimits();
 
         var token = await RegisterAndLoginViaApiAsync(client, email);
-        await SeedUsageAsync(email, TranslyApiFactory.RequestsPerDay, DateTime.UtcNow.AddDays(-1));
+        await SeedUsedCharactersAsync(email, limits.CharactersPerWindow, DateTime.UtcNow.AddDays(-1));
 
         var response = await TranslateAsync(client, token);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(
-            (TranslyApiFactory.RequestsPerDay - 1).ToString(),
+            Invariant(limits.CharactersPerWindow - AnyText.Length),
             Header(response, "X-RateLimit-Remaining"));
     }
 
@@ -231,7 +239,8 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
 
     private static object AnyTranslation() => new
     {
-        text = "Hello world",
+        // text = "Hello world",
+        text = AnyText,
         sourceLanguage = "en",
         targetLanguage = "ar",
         tone = "casual",
@@ -291,7 +300,9 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
     private static string Header(HttpResponseMessage response, string name) =>
     response.Headers.GetValues(name).Single();
 
-    private async Task SeedUsageAsync(string email, int rows, DateTime? createdAtUtc = null)
+
+        // صف واحد committed بعدد الحروف المطلوب — أسرع طريقة نوصل بيها لرصيد معيّن
+    private async Task SeedUsedCharactersAsync(string email, int characters, DateTime? createdAtUtc = null)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
@@ -306,21 +317,26 @@ public class TranslationsEndpointTests(TranslyApiFactory factory)
             .Select(tone => tone.Id)
             .SingleAsync();
 
-        for (var i = 0; i < rows; i++)
+        db.TranslationUsages.Add(new TranslationUsage
         {
-            db.TranslationUsages.Add(new TranslationUsage
-            {
-                UserId = userId,
-                SourceLanguage = "en",
-                TargetLanguage = "ar",
-                ToneId = toneId,
-                CharacterCount = 11,
-                Status = UsageStatus.Committed,
-                Source = TranslationSource.Gemini,
-                CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
-            });
-        }
+            UserId = userId,
+            SourceLanguage = "en",
+            TargetLanguage = "ar",
+            ToneId = toneId,
+            CharacterCount = characters,
+            Status = UsageStatus.Committed,
+            Source = TranslationSource.Gemini,
+            CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
+        });
 
         await db.SaveChangesAsync();
     }
+
+    private PlanLimits CharacterLimits()
+    {
+        var plans = factory.Services.GetRequiredService<IOptions<PlansOptions>>().Value;
+        return plans.Catalog[plans.DefaultPlan];
+    }
+
+    private static string Invariant(int value) => value.ToString(CultureInfo.InvariantCulture);
 }

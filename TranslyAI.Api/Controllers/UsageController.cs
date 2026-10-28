@@ -25,6 +25,7 @@ namespace TranslyAI.Api.Controllers
             }
 
             var quota = await quotaService.GetSnapshotAsync(userId.Value, cancellationToken);
+            var audio = await quotaService.GetAudioSnapshotAsync(userId.Value, cancellationToken);
 
             var usage = new UsageResponseDto
             {
@@ -32,6 +33,9 @@ namespace TranslyAI.Api.Controllers
                 CharactersLimit = quota.Limit,
                 CharactersRemaining = quota.Remaining,
                 CharactersUsed = quota.Used,
+                AudioSecondsLimit = audio.Limit,
+                AudioSecondsRemaining = audio.Remaining,
+                AudioSecondsUsed = audio.Used,
                 ResetsAt = quota.ResetsAt
             };
 

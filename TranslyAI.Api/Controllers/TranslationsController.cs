@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TranslyAI.Api.Common;
 using TranslyAI.Api.Dtos;
-using TranslyAI.Api.Enums;
 using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services.IServices;
 using TranslyAI.Api.Services.Result;
@@ -75,54 +74,11 @@ public class TranslationsController(ITranslationService translationService) : Co
                 return this.BadRequestProblem(
                     $"The text exceeds the maximum of {tooLong.MaxCharacters} characters per translation for your plan");
 
-            // 503: الـ quota بتاعتنا خلصت.
-            case TranslationOutcome.RateLimited rateLimited:
-                if (rateLimited.RetryAfter is not null)
-                    Response.Headers.RetryAfter = ((int)rateLimited.RetryAfter.Value.TotalSeconds).ToString();
-                return this.ServiceUnavailableProblem("The translation service is temporarily unavailable. Please try again later");
-
-            // 500: Gemini رفض الطلب بتاعنا (body مش مظبوط أو key مرفوض).
-            case TranslationOutcome.InvalidRequest:
-                return this.InternalErrorProblem("The translation service rejected the request");
-
-            // 504:الـ timeout معناه "جرّب تاني ممكن ينفع"،
-            case TranslationOutcome.UpstreamTimeout:
-                return this.GatewayTimeoutProblem("The translation service did not respond in time");
-
-            // 502: إحنا gateway قدام Gemini، وGemini مردش أو رد برد مش صالح.
-            case TranslationOutcome.UpstreamError:
-                return this.BadGatewayProblem("The translation service returned an invalid response");
-
-            // 422: الطلب صحيح شكلاً ومفهوم، بس المحتوى نفسه اترفض.
-            // دي الحالة الوحيدة هنا اللي العميل يقدر يتصرف فيها — يغيّر النص، فبنقوله السبب.
-            // case TranslationOutcome.NotCompleted notCompleted
-            //         when notCompleted.FinishReason is GeminiFinishReason.Safety or GeminiFinishReason.Recitation:
-            //     return Problem(
-            //         detail: $"The text could not be translated. Reason: {notCompleted.FinishReason}.",
-            //         statusCode: StatusCodes.Status422UnprocessableEntity,
-            //         title: "Unprocessable Entity"
-            //     );
-
-            // 504: الـ interaction لسه شغالة عند Gemini وإحنا مش بنعمل polling.
-            //      "جرّب تاني" إجابة صادقة — على عكس 502 اللي معناها المزوّد بايظ.
-            case TranslationOutcome.NotCompleted notCompleted
-                when notCompleted.Status is GeminiInteractionStatus.Queued or GeminiInteractionStatus.InProgress:
-                return this.GatewayTimeoutProblem("The translation service did not finish in time");
-
-
-            // 500: الرد اتقطع (max tokens غالباً) — ده حد إعدادنا إحنا، مش غلطة العميل.
-            case TranslationOutcome.NotCompleted notCompleted
-                    when notCompleted.Status is GeminiInteractionStatus.Incomplete:
-                return this.InternalErrorProblem("The translation could not be completed");
-
-            // 502: failed / cancelled / unknown — المزوّد وقع أو رجّع حاجة مش فاهمينها.
-            // ⚠️ دَين: الـ 422 بتاعت الحجب (SAFETY) اتشالت — مالهاش مصدر موثّق في الـ API
-            //         الجديدة. الـ errors[] بتتسجّل خام لحد ما نشوف حالة حقيقية.
-            case TranslationOutcome.NotCompleted:
-                return this.BadGatewayProblem("The translation service returned an unexpected result");
-
+           
             default:
-                return this.InternalErrorProblem("Unhandling expeption during Translate");
+                // أخطاء Gemini (503 / 504 / 502 / 500) — نفس الـ mapping في كل الـ endpoints
+                return this.UpstreamProblem(result.Outcome)
+                    ?? this.InternalErrorProblem("Unhandling expeption during Translate");
         }
     }
 

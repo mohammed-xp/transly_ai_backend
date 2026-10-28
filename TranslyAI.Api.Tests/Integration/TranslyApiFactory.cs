@@ -18,7 +18,7 @@ public sealed class TranslyApiFactory : WebApplicationFactory<Program>
 
     public GeminiStubHandler Gemini { get; } = new();
 
-    public const int RequestsPerDay = 2;
+    // public const int RequestsPerDay = 2;
 
 
     public TranslyApiFactory()
@@ -47,7 +47,7 @@ public sealed class TranslyApiFactory : WebApplicationFactory<Program>
                 ["Jwt:Audience"] = "transly-tests",
                 ["Jwt:SigningKey"] = "integration-tests-signing-key-0123456789",
                 ["Jwt:AccessTokenMinutes"] = "5",
-                ["Quota:RequestsPerDay"] = RequestsPerDay.ToString(CultureInfo.InvariantCulture),
+                // ["Quota:RequestsPerDay"] = RequestsPerDay.ToString(CultureInfo.InvariantCulture),
             });
         });
 
