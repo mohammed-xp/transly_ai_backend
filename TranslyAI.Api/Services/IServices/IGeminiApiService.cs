@@ -9,7 +9,16 @@ namespace TranslyAI.Api.Services.IServices
             TranslationRequestDto translationRequest,
             string toneInstruction,
             CancellationToken cancellationToken);
+        
+        Task<ConversationOutcome> TranslateConversationTurnAsync(
+            byte[] wavAudio,
+            string languageA,
+            string languageB,
+            IReadOnlyList<ConversationHistoryItemDto> history,
+            CancellationToken cancellationToken);
 
         string ModelName();
+        
+        string ConversationModelName();
     }
 }
