@@ -143,7 +143,7 @@ public class ConversationsEndpointTests(TranslyApiFactory factory)
 
         await ApiResponseAssert.ProblemAsync(response, HttpStatusCode.TooManyRequests);
         Assert.Equal("0", Header(response, "X-Audio-Seconds-Remaining"));
-        Assert.InRange(response.Headers.RetryAfter!.Delta!.Value, TimeSpan.Zero, TimeSpan.FromDays(1));
+        Assert.InRange(response.Headers.RetryAfter!.Delta!.Value, TimeSpan.Zero, TimeSpan.FromDays(31));
         Assert.Equal(0, factory.Gemini.CallCount);
     }
 

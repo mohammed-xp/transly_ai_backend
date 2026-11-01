@@ -10,5 +10,6 @@
         public required int AudioSecondsUsed { get; init; }
         public required int AudioSecondsRemaining { get; init; }
         public required DateTimeOffset ResetsAt { get; init; }
+        public required DateTimeOffset AudioResetsAt { get; init; }
     }
 }

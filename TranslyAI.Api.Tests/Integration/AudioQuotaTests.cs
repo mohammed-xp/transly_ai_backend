@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Enums;
 using TranslyAI.Api.Services.IServices;
 using TranslyAI.Api.Services.Result;
 
@@ -129,6 +130,78 @@ public class AudioQuotaTests(TranslyApiFactory factory)
 
         var characters = await quota.GetSnapshotAsync(userId, CancellationToken.None);
         Assert.Equal(0, characters.Used);
+    }
+
+    [Fact]
+    public async Task AudioSnapshot_CountsUsageFromTheStartOfTheMonth()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var quota = scope.ServiceProvider.GetRequiredService<IQuotaService>();
+        var userId = await CreateUserAsync(scope);
+        await SeedCommittedUsageAsync(scope, userId, 15, StartOfMonth(DateTime.UtcNow));
+
+        var snapshot = await quota.GetAudioSnapshotAsync(userId, CancellationToken.None);
+
+        Assert.Equal(15, snapshot.Used);
+    }
+
+    [Fact]
+    public async Task AudioSnapshot_IgnoresUsageFromThePreviousMonth()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var quota = scope.ServiceProvider.GetRequiredService<IQuotaService>();
+        var userId = await CreateUserAsync(scope);
+        await SeedCommittedUsageAsync(scope, userId, 15, StartOfMonth(DateTime.UtcNow).AddSeconds(-1));
+
+        var snapshot = await quota.GetAudioSnapshotAsync(userId, CancellationToken.None);
+
+        Assert.Equal(0, snapshot.Used);
+    }
+
+    [Fact]
+    public async Task AudioSnapshot_ResetsAtTheStartOfNextMonth()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var quota = scope.ServiceProvider.GetRequiredService<IQuotaService>();
+        var userId = await CreateUserAsync(scope);
+
+        var snapshot = await quota.GetAudioSnapshotAsync(userId, CancellationToken.None);
+
+        var expected = new DateTimeOffset(StartOfMonth(DateTime.UtcNow).AddMonths(1), TimeSpan.Zero);
+        Assert.Equal(expected, snapshot.ResetsAt);
+    }
+
+    [Fact]
+    public async Task CharacterSnapshot_StillResetsAtTheNextUtcMidnight()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var quota = scope.ServiceProvider.GetRequiredService<IQuotaService>();
+        var userId = await CreateUserAsync(scope);
+
+        var snapshot = await quota.GetSnapshotAsync(userId, CancellationToken.None);
+
+        var expected = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(1), TimeSpan.Zero);
+        Assert.Equal(expected, snapshot.ResetsAt);
+    }
+
+    private static DateTime StartOfMonth(DateTime utc) =>
+        new(utc.Year, utc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    private static async Task SeedCommittedUsageAsync(AsyncServiceScope scope, Guid userId, int seconds, DateTime createdAtUtc)
+    {
+        var db = scope.ServiceProvider.GetRequiredService<TranslyDbContext>();
+
+        db.ConversationUsages.Add(new ConversationUsage
+        {
+            UserId = userId,
+            LanguageA = "ar",
+            LanguageB = "en",
+            AudioSeconds = seconds,
+            Status = UsageStatus.Committed,
+            CreatedAtUtc = createdAtUtc,
+        });
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task<Guid> CreateUserAsync(AsyncServiceScope scope)

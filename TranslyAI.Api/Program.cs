@@ -15,6 +15,7 @@ using TranslyAI.Api.Common;
 using TranslyAI.Api.Data;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Entities;
+using TranslyAI.Api.Enums;
 using TranslyAI.Api.Extensions;
 using TranslyAI.Api.Services;
 using TranslyAI.Api.Services.IServices;
@@ -70,6 +71,10 @@ builder.Services.AddOptions<PlansOptions>()
         plans => plans.Catalog is not null && plans.Catalog.Values.All(limits =>
             Validator.TryValidateObject(limits, new ValidationContext(limits), null, validateAllProperties: true)),
         "Every plan in Plans:Catalog must have valid limits (check the [Range] rules in PlanLimits)."
+    )
+    .Validate(
+        plans => plans.Catalog is not null && plans.Catalog.Values.All(limits => limits.AudioWindow != QuotaWindow.BillingPeriod),
+        "AudioWindow must be Daily or Monthly."
     )
     .ValidateOnStart();
 

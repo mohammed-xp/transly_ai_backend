@@ -96,7 +96,7 @@ namespace TranslyAI.Api.Services
         public async Task<QuotaSnapshot> GetAudioSnapshotAsync(Guid userId, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
-            var period = CurrentPeriod(now);
+            var period = CurrentAudioPeriod(now);
             var used = await SumAudioSecondsUsedAsync(userId, period.StartUtc, now, cancellationToken);
 
             return period.AudioSnapshot(used);
@@ -105,7 +105,7 @@ namespace TranslyAI.Api.Services
         public async Task<AudioQuotaReservation> TryReserveAudioAsync(Guid userId, string languageA, string languageB, int audioSeconds, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
-            var period = CurrentPeriod(now);
+            var period = CurrentAudioPeriod(now);
 
             // فحص الطول الأول — من غير transaction ولا lock
             if (audioSeconds > period.Limits.MaxAudioSecondsPerRequest)
@@ -193,6 +193,28 @@ namespace TranslyAI.Api.Services
                 limits,
                 startUtc,
                 new DateTimeOffset(startUtc.AddDays(1), TimeSpan.Zero));
+        }
+
+        private QuotaPeriod CurrentAudioPeriod(DateTime now)
+        {
+            var plans = plansOptions.Value;
+            var limits = plans.Catalog[plans.DefaultPlan];
+
+            var (startUtc, endUtc) = limits.AudioWindow switch
+            {
+                QuotaWindow.Daily => (now.Date, now.Date.AddDays(1)),
+                QuotaWindow.Monthly => MonthOf(now),
+                _ => throw new InvalidOperationException($"Unsupported audio window: {limits.AudioWindow}.")
+            };
+
+            return new QuotaPeriod(plans.DefaultPlan, limits, startUtc, new DateTimeOffset(endUtc, TimeSpan.Zero));
+        }
+
+        private static (DateTime StartUtc, DateTime EndUtc) MonthOf(DateTime now)
+        {
+            var startUtc = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            return (startUtc, startUtc.AddMonths(1));
         }
 
         private sealed record QuotaPeriod(string Plan, PlanLimits Limits, DateTime StartUtc, DateTimeOffset ResetsAt)

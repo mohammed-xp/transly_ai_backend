@@ -17,6 +17,9 @@ namespace TranslyAI.Api.AppSettings
         [Range(0, 1_000_000, ErrorMessage = "AudioSecondsPerWindow must be between {1} and {2}.")]
         public required int AudioSecondsPerWindow { get; init; }
 
+        [EnumDataType(typeof(QuotaWindow), ErrorMessage = "AudioWindow is required and must be Daily or Monthly.")]
+        public required QuotaWindow AudioWindow { get; init; }
+
         [Range(0, 120, ErrorMessage = "MaxAudioSecondsPerRequest must be between {1} and {2}.")]
         public required int MaxAudioSecondsPerRequest { get; init; }
     }

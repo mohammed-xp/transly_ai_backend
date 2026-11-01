@@ -36,7 +36,8 @@ namespace TranslyAI.Api.Controllers
                 AudioSecondsLimit = audio.Limit,
                 AudioSecondsRemaining = audio.Remaining,
                 AudioSecondsUsed = audio.Used,
-                ResetsAt = quota.ResetsAt
+                ResetsAt = quota.ResetsAt,
+                AudioResetsAt = audio.ResetsAt
             };
 
             return Ok(ApiResponse<UsageResponseDto>.Ok(usage, "Usage retrieved successfully"));
