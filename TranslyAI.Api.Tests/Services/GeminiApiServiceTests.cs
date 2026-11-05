@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
@@ -20,10 +21,12 @@ public class GeminiApiServiceTests
     private const string AnyToneInstruction = "Use a neutral tone.";
 
     private readonly FakeLogger<GeminiApiService> _logger = new();
+    private StubHttpMessageHandler? _handler;
 
     private GeminiApiService CreateService(HttpResponseMessage response)
     {
-        var httpClient = new HttpClient(new StubHttpMessageHandler(response));
+        _handler = new StubHttpMessageHandler(response);
+        var httpClient = new HttpClient(_handler);
 
         var options = Options.Create(new GeminiOptions
         {
@@ -177,5 +180,36 @@ public class GeminiApiServiceTests
         // ثانوي: القيمة الراجعة. لاحظ إنها كانت بتعدّي صح حتى والتحذير بايظ.
         var notCompleted = Assert.IsType<TranslationOutcome.NotCompleted>(outcome);
         Assert.Equal(GeminiInteractionStatus.Unknown, notCompleted.Status);
+    }
+
+    // ── 6. التعليمات منفصلة عن كلام المستخدم ─────────────────
+
+    [Fact]
+    public async Task TranslateAsync_SendsInstructionsAsSystemInstructionAndTextAsInput()
+    {
+        const string body = """
+        {
+          "status": "completed",
+          "model": "gemini-3.7-flash",
+          "steps": [
+            {
+              "type": "model_output",
+              "content": [ { "type": "text", "text": "مرحبا" } ]
+            }
+          ]
+        }
+        """;
+
+        var service = CreateService(Respond(HttpStatusCode.OK, body));
+
+        await service.TranslateAsync(AnyRequest(), AnyToneInstruction, CancellationToken.None);
+
+        var request = JsonNode.Parse(_handler!.RequestBody!)!;
+
+        Assert.Equal("Hello", request["input"]!.GetValue<string>());
+
+        var instruction = request["system_instruction"]!.GetValue<string>();
+        Assert.Contains("from English into Arabic", instruction);
+        Assert.Contains(AnyToneInstruction, instruction);
     }
 }

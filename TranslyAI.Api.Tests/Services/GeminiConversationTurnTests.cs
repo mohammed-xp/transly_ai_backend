@@ -9,6 +9,7 @@ using TranslyAI.Api.AppSettings;
 using TranslyAI.Api.Dtos;
 using TranslyAI.Api.Services;
 using TranslyAI.Api.Services.Result;
+using TranslyAI.Api.Tests.Fakes;
 
 namespace TranslyAI.Api.Tests.Services;
 
@@ -179,11 +180,11 @@ public class GeminiConversationTurnTests
         IReadOnlyList<ConversationHistoryItemDto>? history = null) =>
         service.TranslateConversationTurnAsync(AnyWav, "ar", "en", history ?? [], CancellationToken.None);
 
-    private static (GeminiApiService Service, CapturingHandler Handler) CreateService(
+    private static (GeminiApiService Service, StubHttpMessageHandler Handler) CreateService(
         HttpResponseMessage response,
         string? conversationModel = ConversationModel)
     {
-        var handler = new CapturingHandler(response);
+        var handler = new StubHttpMessageHandler(response);
 
         var options = Options.Create(new GeminiOptions
         {
@@ -225,22 +226,5 @@ public class GeminiConversationTurnTests
     {
         var failure = Assert.IsType<ConversationOutcome.UpstreamFailure>(outcome);
         Assert.IsType<TranslationOutcome.UpstreamError>(failure.Error);
-    }
-
-    // بيرجّع رد ثابت، وبيحفظ الـ body اللي اتبعت عشان نفحصه
-    private sealed class CapturingHandler(HttpResponseMessage response) : HttpMessageHandler
-    {
-        public string? RequestBody { get; private set; }
-
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            RequestBody = request.Content is null
-                ? null
-                : await request.Content.ReadAsStringAsync(cancellationToken);
-
-            return response;
-        }
     }
 }

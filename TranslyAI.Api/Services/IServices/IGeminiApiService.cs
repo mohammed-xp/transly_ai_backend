@@ -20,5 +20,7 @@ namespace TranslyAI.Api.Services.IServices
         string ModelName();
         
         string ConversationModelName();
+
+        int TranslationPromptVersion();
     }
 }

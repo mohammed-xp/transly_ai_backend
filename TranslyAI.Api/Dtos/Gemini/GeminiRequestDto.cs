@@ -9,6 +9,9 @@ public record GeminiRequestDto
     public required string Input { get; init; }
     [JsonPropertyName("model")]
     public required string Model { get; init; }
+    [JsonPropertyName("system_instruction")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SystemInstruction { get; init; }
     [JsonPropertyName("store")]
     public bool Store { get; init; }
 }

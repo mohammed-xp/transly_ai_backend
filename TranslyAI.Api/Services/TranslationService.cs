@@ -89,7 +89,7 @@ public class TranslationService(
         ResolvedTone tone,
         CancellationToken cancellationToken)
     {
-        var cacheKey = BuildCacheKey(request, tone);
+        var cacheKey = BuildCacheKey(request, tone, geminiApiService.TranslationPromptVersion());
 
         var model = geminiApiService.ModelName();
 
@@ -150,9 +150,9 @@ public class TranslationService(
         }
     }
 
-    private static string BuildCacheKey(TranslationRequestDto request, ResolvedTone tone)
+    private static string BuildCacheKey(TranslationRequestDto request, ResolvedTone tone, int promptVersion)
     {
-        var material = $"{request.SourceLanguage}\n{request.TargetLanguage}\n{tone.Code}@{tone.PromptVersion}\n{request.Text}";
+        var material = $"prompt@{promptVersion}\n{request.SourceLanguage}\n{request.TargetLanguage}\n{tone.Code}@{tone.PromptVersion}\n{request.Text}";
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     }
